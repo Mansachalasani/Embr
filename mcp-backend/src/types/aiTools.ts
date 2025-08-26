@@ -25,6 +25,7 @@ export interface AIToolSelection {
   confidence: number;
   parameters: Record<string, any>;
   reasoning: string;
+  geminiOutput?: string;
 }
 
 export interface AIResponse {
