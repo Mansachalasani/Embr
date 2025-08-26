@@ -2,6 +2,7 @@ import { ChatMessage, AVAILABLE_COMMANDS } from '../types/chat';
 import { MCPService } from './mcpService';
 import { MCPTestService } from './mcpTest';
 import { TokenDebugger } from './debugTokens';
+import { AIService } from './aiService';
 
 export class ChatService {
   static generateId(): string {
@@ -109,11 +110,71 @@ export class ChatService {
           ));
       }
     } else {
-      // Handle regular chat messages
-      responses.push(this.createMessage(
-        'assistant',
-        `I received your message: "${userMessage}". I can help you with your calendar and emails using commands like /calendar or /emails. Type /help for more options.`
-      ));
+      // Handle regular chat messages with AI
+      console.log('🤖 Processing natural language query:', userMessage);
+      responses.push(this.createMessage('system', 'Processing your request...', { loading: true }));
+      
+      try {
+        // Check if AI is available
+        console.log('🔍 Checking AI availability...');
+        const aiAvailable = await AIService.checkAIAvailability();
+        console.log('🔍 AI Available:', aiAvailable);
+        
+        if (aiAvailable) {
+          // Use AI to process natural language query
+          console.log('🧠 Sending query to AI service...');
+          const aiResponse = await AIService.processQuery({
+            query: userMessage,
+            preferences: {
+              responseStyle: 'conversational',
+              includeActions: true
+            }
+          });
+          
+          console.log('🧠 AI Response:', aiResponse);
+          
+          if (aiResponse.success && aiResponse.data) {
+            responses.push(this.createMessage(
+              'assistant',
+              aiResponse.data.response,
+              {
+                toolName: aiResponse.data.toolUsed,
+                toolData: aiResponse.data.rawData
+              }
+            ));
+            
+            // Add suggested actions if available
+            if (aiResponse.data.suggestedActions && aiResponse.data.suggestedActions.length > 0) {
+              responses.push(this.createMessage(
+                'system',
+                `💡 **Suggestions:**\n${aiResponse.data.suggestedActions.map(action => `• ${action}`).join('\n')}`,
+                { toolName: 'suggestions' }
+              ));
+            }
+          } else {
+            // AI failed, fall back to simple response
+            console.log('❌ AI query failed:', aiResponse.error);
+            responses.push(this.createMessage(
+              'assistant',
+              `I received your message: "${userMessage}". I can help you with your calendar and emails using commands like /calendar or /emails. Type /help for more options.`
+            ));
+          }
+        } else {
+          // AI not available, use fallback
+          responses.push(this.createMessage(
+            'assistant',
+            `I received your message: "${userMessage}". I can help you with your calendar and emails using commands like /calendar or /emails. Type /help for more options.`
+          ));
+        }
+      } catch (error) {
+        console.error('❌ AI processing error:', error);
+        console.error('❌ Error details:', error.message);
+        // Fall back to simple response on error
+        responses.push(this.createMessage(
+          'assistant',
+          `I received your message: "${userMessage}". I can help you with your calendar and emails using commands like /calendar or /emails. Type /help for more options.`
+        ));
+      }
     }
     
     return responses;
@@ -127,8 +188,16 @@ export class ChatService {
       helpText += `Example: \`${cmd.example}\`\n\n`;
     });
     
+    helpText += "🤖 **Natural Language Queries:**\n";
+    helpText += "You can also ask me questions naturally! Try:\n";
+    helpText += "• \"What meetings do I have today?\"\n";
+    helpText += "• \"Do I have any meetings after lunch?\"\n";
+    helpText += "• \"Check my latest emails\"\n";
+    helpText += "• \"Any urgent messages?\"\n\n";
+    
     helpText += "💡 **Tips:**\n";
     helpText += "• Commands start with `/`\n";
+    helpText += "• Natural language works without `/`\n";
     helpText += "• Make sure your Google Workspace is connected\n";
     helpText += "• Check /status if commands aren't working\n";
     

@@ -1,6 +1,7 @@
 import express from 'express';
 import authRoutes from './auth';
 import mcpRoutes from './mcp';
+import aiRoutes from './ai';
 
 const router = express.Router();
 
@@ -28,6 +29,7 @@ router.get('/', (req, res) => {
       endpoints: {
         auth: '/api/auth/*',
         mcp: '/api/mcp/*',
+        ai: '/api/ai/*',
         health: '/api/health',
       },
     },
@@ -38,5 +40,6 @@ router.get('/', (req, res) => {
 // Mount route modules
 router.use('/auth', authRoutes);
 router.use('/mcp', mcpRoutes);
+router.use('/ai', aiRoutes);
 
 export default router;

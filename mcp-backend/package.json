@@ -8,11 +8,17 @@
     "dev": "nodemon src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["mcp", "google-workspace", "supabase", "oauth2"],
+  "keywords": [
+    "mcp",
+    "google-workspace",
+    "supabase",
+    "oauth2"
+  ],
   "author": "",
   "license": "ISC",
   "description": "MCP Orchestrator Backend with Google Workspace Integration",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.56.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",

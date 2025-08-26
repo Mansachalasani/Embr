@@ -8,6 +8,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import routes from './routes';
 import { registerAllTools } from './services/tools';
+import { AIController } from './controllers/aiController';
 
 // Validate required environment variables
 const requiredEnvVars = [
@@ -60,6 +61,12 @@ app.use(morgan(process.env.NODE_ENV === 'development' ? 'dev' : 'combined'));
 // Register MCP tools
 console.log('Registering MCP tools...');
 registerAllTools();
+
+// Initialize AI Service (optional - will disable AI features if GEMINI_API_KEY is missing)
+console.log('Initializing AI Service...');
+AIController.initializeAI().catch(error => {
+  console.warn('⚠️ AI Service initialization failed - AI features will be disabled:', error.message);
+});
 
 // Routes
 app.use('/api', routes);

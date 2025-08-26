@@ -1,0 +1,218 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { AIToolMetadata, AIToolSelection, AIResponse, UserContext } from '../types/aiTools';
+import { MCPToolRegistry } from './mcpToolRegistry';
+
+export class AIService {
+  private genAI: GoogleGenerativeAI;
+  private model: any;
+  private toolRegistry: MCPToolRegistry;
+
+  constructor() {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY environment variable is required');
+    }
+    
+    this.genAI = new GoogleGenerativeAI(apiKey);
+    this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    this.toolRegistry = MCPToolRegistry.getInstance();
+  }
+
+  /**
+   * Main AI reasoning pipeline
+   */
+  async processQuery(context: UserContext, userId: string): Promise<AIResponse> {
+    try {
+      console.log('🧠 AI Processing query:', context.query);
+      
+      // Step 1: Analyze query and select tool
+      const toolSelection = await this.selectTool(context);
+      
+      if (!toolSelection) {
+        return {
+          success: false,
+          naturalResponse: "I'm not sure how to help with that request. I can assist with calendar events, emails, and productivity tasks.",
+          error: 'No suitable tool found'
+        };
+      }
+
+      console.log('🎯 Selected tool:', toolSelection.tool, 'with confidence:', toolSelection.confidence);
+      
+      // Step 2: Execute the selected tool
+      const toolResult = await this.executeTool(toolSelection, userId);
+      
+      // Step 3: Generate natural language response
+      const naturalResponse = await this.generateResponse(context, toolSelection, toolResult);
+      
+      return {
+        success: true,
+        toolUsed: toolSelection.tool,
+        rawData: toolResult.data,
+        naturalResponse,
+        reasoning: toolSelection.reasoning,
+        suggestedActions: await this.generateSuggestedActions(context, toolResult)
+      };
+
+    } catch (error) {
+      console.error('❌ AI processing error:', error);
+      return {
+        success: false,
+        naturalResponse: 'Sorry, I encountered an error while processing your request. Please try again.',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Analyze user query and select the best tool
+   */
+  private async selectTool(context: UserContext): Promise<AIToolSelection | null> {
+    const availableTools = this.toolRegistry.getAllToolMetadata();
+    
+    const prompt = `
+You are an intelligent assistant that helps users with calendar, email, and productivity tasks.
+
+Available Tools:
+${this.formatToolsForPrompt(availableTools)}
+
+User Query: "${context.query}"
+Timestamp: ${context.timestamp}
+
+Analyze the user's query and determine:
+1. Which tool (if any) best matches their request
+2. What parameters should be passed to that tool
+3. Your confidence level (0-100)
+4. Your reasoning
+
+Respond in JSON format:
+{
+  "tool": "toolName or null",
+  "confidence": 85,
+  "parameters": {},
+  "reasoning": "explanation of your choice"
+}
+
+Guidelines:
+- Calendar queries: use getTodaysEvents for "today", "this morning", "afternoon", "meetings"
+- Email queries: use getLastTenMails for "emails", "messages", "inbox"
+- If the query is unclear or doesn't match any tool, return tool: null
+- Be precise with parameters - only include what the user specified
+`;
+
+    try {
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      let text = response.text().trim();
+
+      // Sanitize for safety
+      if (text.startsWith("```")) {
+        text = text.replace(/```(json)?/g, "").trim();
+      }
+    
+      
+      console.log('🤖 AI tool selection response:', text);
+      
+      const selection = JSON.parse(text);
+      
+      // Validate selection
+      if (selection.tool && !availableTools.find(t => t.name === selection.tool)) {
+        console.warn('⚠️ AI selected invalid tool:', selection.tool);
+        return null;
+      }
+      
+      return selection.tool ? selection : null;
+      
+    } catch (error) {
+      console.error('❌ Error in tool selection:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Execute the selected MCP tool
+   */
+  private async executeTool(selection: AIToolSelection, userId: string): Promise<any> {
+    const tool = this.toolRegistry.getTool(selection.tool);
+    if (!tool) {
+      throw new Error(`Tool ${selection.tool} not found`);
+    }
+
+    console.log('🔧 Executing tool:', selection.tool, 'with params:', selection.parameters);
+    
+    return await tool.execute(userId, selection.parameters);
+  }
+
+  /**
+   * Generate natural language response from tool result
+   */
+  private async generateResponse(context: UserContext, selection: AIToolSelection, toolResult: any): Promise<string> {
+    if (!toolResult.success) {
+      return `I couldn't retrieve the information you requested. ${toolResult.error || 'Please try again later.'}`;
+    }
+
+    const prompt = `
+You are a helpful personal assistant. Convert this raw data into a natural, conversational response.
+
+Original Query: "${context.query}"
+Tool Used: ${selection.tool}
+Raw Data: ${JSON.stringify(toolResult.data, null, 2)}
+
+Instructions:
+- Write in a friendly, conversational tone
+- Focus on what the user asked for specifically
+- If it's calendar data, mention times and key details
+- If it's email data, summarize key messages
+- Keep it concise but informative
+- Use emojis sparingly and appropriately
+- If the data is empty or minimal, acknowledge that naturally
+
+Examples:
+- For calendar: "You have 3 meetings today. Your next one is the team standup at 10 AM."
+- For email: "You have 5 new emails. The most recent is from John about the project deadline."
+
+Generate a natural response:
+`;
+
+    try {
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      return response.text().trim();
+    } catch (error) {
+      console.error('❌ Error generating response:', error);
+      return 'I found the information you requested, but had trouble formatting the response. Please check the raw data above.';
+    }
+  }
+
+  /**
+   * Generate suggested follow-up actions
+   */
+  private async generateSuggestedActions(context: UserContext, toolResult: any): Promise<string[]> {
+    // Simple rule-based suggestions for now
+    const suggestions: string[] = [];
+    
+    if (context.query.toLowerCase().includes('calendar') || context.query.toLowerCase().includes('meeting')) {
+      suggestions.push('Would you like to see your schedule for tomorrow?');
+      suggestions.push('Do you want to check for any conflicts?');
+    }
+    
+    if (context.query.toLowerCase().includes('email')) {
+      suggestions.push('Would you like me to check for any urgent emails?');
+      suggestions.push('Do you want to see emails from specific people?');
+    }
+    
+    return suggestions.slice(0, 2); // Limit to 2 suggestions
+  }
+
+  /**
+   * Format available tools for the AI prompt
+   */
+  private formatToolsForPrompt(tools: AIToolMetadata[]): string {
+    return tools.map(tool => `
+Tool: ${tool.name}
+Description: ${tool.description}
+Category: ${tool.category}
+Parameters: ${tool.parameters.map(p => `${p.name} (${p.type}${p.required ? ', required' : ''}): ${p.description}`).join(', ')}
+Examples: ${tool.examples.map(e => `"${e.query}"`).join(', ')}
+`).join('\n');
+  }
+}
