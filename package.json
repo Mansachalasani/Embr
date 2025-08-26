@@ -1,7 +1,7 @@
 {
   "name": "supabaseauthapp",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
@@ -9,10 +9,22 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.0.0",
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-native-google-signin/google-signin": "^15.0.0",
+    "@supabase/supabase-js": "^2.56.0",
     "expo": "~53.0.22",
+    "expo-auth-session": "^6.2.1",
+    "expo-crypto": "^14.1.5",
+    "expo-router": "^5.1.4",
     "expo-status-bar": "~2.2.3",
+    "expo-web-browser": "^14.2.0",
     "react": "19.0.0",
-    "react-native": "0.79.6"
+    "react-dom": "19.0.0",
+    "react-native": "0.79.6",
+    "react-native-safe-area-context": "^5.6.1",
+    "react-native-screens": "^4.15.2",
+    "react-native-web": "^0.20.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
