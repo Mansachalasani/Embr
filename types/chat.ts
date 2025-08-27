@@ -1,6 +1,6 @@
 export interface ChatMessage {
   id: string;
-  type: 'user' | 'assistant' | 'system';
+  type: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   timestamp: string;
   metadata?: {
@@ -8,6 +8,7 @@ export interface ChatMessage {
     toolData?: any;
     error?: boolean;
     loading?: boolean;
+    reasoning?: string;
   };
 }
 

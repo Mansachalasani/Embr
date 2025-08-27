@@ -78,7 +78,7 @@ export class AIService {
   /**
    * Analyze user query and select the best tool
    */
-  private async selectTool(context: UserContext): Promise<AIToolSelection | null> {
+  public async selectTool(context: UserContext): Promise<AIToolSelection | null> {
     const availableTools = this.toolRegistry.getAllToolMetadata();
     
 //     const prompt = `
@@ -181,7 +181,7 @@ Guidelines:
   /**
    * Execute the selected MCP tool with caching
    */
-  private async executeTool(selection: AIToolSelection, userId: string): Promise<any> {
+  public async executeTool(selection: AIToolSelection, userId: string): Promise<any> {
     const tool = this.toolRegistry.getTool(selection.tool);
     if (!tool) {
       throw new Error(`Tool ${selection.tool} not found`);
@@ -230,7 +230,7 @@ Guidelines:
   /**
    * Generate natural language response from tool result
    */
-  private async generateResponse(context: UserContext, selection: AIToolSelection, toolResult: any): Promise<string> {
+  public async generateResponse(context: UserContext, selection: AIToolSelection, toolResult: any): Promise<string> {
     if (!toolResult.success) {
       return `I couldn't retrieve the information you requested. ${toolResult.error || 'Please try again later.'}`;
     }
@@ -271,7 +271,7 @@ Generate a natural response:
   /**
    * Generate suggested follow-up actions
    */
-  private async generateSuggestedActions(context: UserContext, toolResult: any): Promise<string[]> {
+  public async generateSuggestedActions(context: UserContext, toolResult: any): Promise<string[]> {
     // Simple rule-based suggestions for now
     const suggestions: string[] = [];
     

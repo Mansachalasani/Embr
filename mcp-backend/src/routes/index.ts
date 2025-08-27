@@ -3,6 +3,7 @@ import authRoutes from './auth';
 import mcpRoutes from './mcp';
 import aiRoutes from './ai';
 import sessionRoutes from './sessions';
+import streamingRoutes from './streaming';
 
 const router = express.Router();
 
@@ -32,6 +33,7 @@ router.get('/', (req, res) => {
         mcp: '/api/mcp/*',
         ai: '/api/ai/*',
         sessions: '/api/sessions/*',
+        streaming: '/api/streaming/*',
         health: '/api/health',
       },
     },
@@ -44,5 +46,6 @@ router.use('/auth', authRoutes);
 router.use('/mcp', mcpRoutes);
 router.use('/ai', aiRoutes);
 router.use('/sessions', sessionRoutes);
+router.use('/streaming', streamingRoutes);
 
 export default router;

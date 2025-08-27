@@ -21,6 +21,8 @@ import { Session, Message } from '../../types/session';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SessionList } from '../../components/SessionList';
 import { ThinkingAnimation } from '../../components/ThinkingAnimation';
+import { StreamingMessage } from '../../components/StreamingMessage';
+import { StreamingCallbacks } from '../../services/streamingService';
 
 const CURRENT_SESSION_KEY = 'current_session_id';
 const { width: screenWidth } = Dimensions.get('window');
@@ -33,6 +35,13 @@ export default function Chat() {
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   const [showSessions, setShowSessions] = useState(false);
   const [thinkingMessage, setThinkingMessage] = useState('');
+  const [streamingMessage, setStreamingMessage] = useState<{
+    id: string;
+    content: string;
+    isStreaming: boolean;
+    toolName?: string;
+    toolStatus?: string;
+  } | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const messageCache = useRef<Map<string, ChatMessage[]>>(new Map());
 
@@ -141,59 +150,237 @@ export default function Chat() {
     setInputText('');
     setIsLoading(true);
     
-    // Set thinking message
-    const thinkingMessages = [
-      'Analyzing your request...',
-      'Processing with AI...',
-      'Searching through data...',
-      'Generating response...',
-      'Almost there...'
-    ];
+    // Save user message to session (async, don't wait)
+    SessionService.addMessage(currentSession.id, 'user', currentInput).catch(console.error);
     
-    let thinkingIndex = 0;
-    setThinkingMessage(thinkingMessages[0]);
-    
-    const thinkingInterval = setInterval(() => {
-      thinkingIndex = (thinkingIndex + 1) % thinkingMessages.length;
-      setThinkingMessage(thinkingMessages[thinkingIndex]);
-    }, 2000);
+    // Initialize streaming message
+    const streamingId = ChatService.generateId();
+    setStreamingMessage({
+      id: streamingId,
+      content: '',
+      isStreaming: true,
+    });
+
+    // Define streaming callbacks
+    const streamingCallbacks: StreamingCallbacks = {
+      onStart: (data) => {
+        console.log('🚀 Stream started:', data);
+        if (data.cached) {
+          setThinkingMessage('Using cached response...');
+        } else if (data.isCommand) {
+          setThinkingMessage('Processing command...');
+        } else if (data.fallback) {
+          setThinkingMessage('Processing your request...');
+        } else {
+          setThinkingMessage('Analyzing your request...');
+        }
+      },
+      
+      onToolSelection: (data) => {
+        console.log('🎯 Tool selection:', data);
+        if (data.status === 'analyzing') {
+          setStreamingMessage(prev => prev ? {
+            ...prev,
+            toolStatus: 'analyzing'
+          } : null);
+          setThinkingMessage('Understanding your request...');
+        } else if (data.status === 'selected') {
+          setStreamingMessage(prev => prev ? {
+            ...prev,
+            toolName: data.tool,
+            toolStatus: 'selected'
+          } : null);
+          setThinkingMessage(`Selected: ${data.tool}`);
+        }
+      },
+      
+      onToolExecution: (data) => {
+        console.log('🔧 Tool execution:', data);
+        if (data.status === 'executing') {
+          setStreamingMessage(prev => prev ? {
+            ...prev,
+            toolName: data.tool,
+            toolStatus: 'executing'
+          } : null);
+          setThinkingMessage(data.message || `Executing ${data.tool}...`);
+        } else if (data.status === 'completed') {
+          setThinkingMessage('Generating response...');
+        }
+      },
+      
+      onResponseChunk: (data) => {
+        console.log('📝 Response chunk received:', { status: data.status, chunkLength: data.chunk?.length, isComplete: data.isComplete });
+        
+        if (data.status === 'generating') {
+          setThinkingMessage('Generating response...');
+          return;
+        }
+        
+        // Update streaming message with new chunk
+        setStreamingMessage(prev => {
+          const newState = prev ? {
+            ...prev,
+            content: data.chunk,
+            isStreaming: !data.isComplete,
+            toolStatus: undefined // Clear tool status when response starts
+          } : null;
+          console.log('📝 Updated streaming message:', newState);
+          return newState;
+        });
+        
+        // Auto-scroll as content is being typed
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 50);
+      },
+      
+      onComplete: (data) => {
+        console.log('✅ Stream completed:', data);
+        console.log('🔍 StreamingMessage state:', streamingMessage);
+        console.log('🔍 UpdatedMessages length:', updatedMessages.length);
+        
+        // Use responses from data if available, fallback to streamingMessage content
+        let finalMessages = [...updatedMessages];
+        
+        if (data.responses && data.responses.length > 0) {
+          // Use the actual responses from the completion data
+          console.log('✅ Using responses from data:', data.responses.length, 'responses');
+          finalMessages = [...updatedMessages, ...data.responses];
+        } else if (streamingMessage && streamingMessage.content) {
+          console.log('✅ Using streamingMessage content:', streamingMessage.content.length, 'chars');
+          // Fallback to streaming message content
+          const finalMessage = ChatService.createMessage(
+            'assistant',
+            streamingMessage.content,
+            {
+              toolName: data.toolUsed,
+              toolData: data.rawData,
+              reasoning: data.reasoning
+            }
+          );
+          finalMessages = [...updatedMessages, finalMessage];
+        }
+        
+        // Update messages in UI
+        console.log('🎯 Setting final messages:', finalMessages.length, 'total messages');
+        setMessages(finalMessages);
+        
+        // Update cache
+        messageCache.current.set(currentSession.id, finalMessages);
+        
+        // Save messages to session (async)
+        const responsesToSave = data.responses || (streamingMessage?.content ? [
+          ChatService.createMessage('assistant', streamingMessage.content, {
+            toolName: data.toolUsed,
+            toolData: data.rawData,
+            reasoning: data.reasoning
+          })
+        ] : []);
+        
+        for (const response of responsesToSave) {
+          SessionService.addMessage(
+            currentSession.id,
+            response.type as 'user' | 'assistant' | 'system',
+            response.content,
+            response.metadata
+          ).catch(console.error);
+        }
+        
+        // Add suggested actions if available
+        if (data.suggestedActions && data.suggestedActions.length > 0) {
+          const suggestionsMessage = ChatService.createMessage(
+            'system',
+            `💡 **Suggestions:**\n${data.suggestedActions.map((action: string) => `• ${action}`).join('\n')}`,
+            { toolName: 'suggestions' }
+          );
+          
+          const messagesWithSuggestions = [...finalMessages, suggestionsMessage];
+          setMessages(messagesWithSuggestions);
+          messageCache.current.set(currentSession.id, messagesWithSuggestions);
+          
+          SessionService.addMessage(
+            currentSession.id,
+            'system',
+            suggestionsMessage.content,
+            suggestionsMessage.metadata
+          ).catch(console.error);
+        }
+        
+        // Clear streaming state
+        setStreamingMessage(null);
+        setIsLoading(false);
+        setThinkingMessage('');
+      },
+      
+      onError: (error) => {
+        console.error('❌ Streaming error:', error);
+        
+        const errorMessage = ChatService.createMessage(
+          'assistant',
+          `❌ **Error:** ${error}`,
+          { error: true }
+        );
+        
+        const finalMessages = [...updatedMessages, errorMessage];
+        setMessages(finalMessages);
+        
+        // Update cache
+        messageCache.current.set(currentSession.id, finalMessages);
+        
+        // Save error message
+        SessionService.addMessage(
+          currentSession.id,
+          'assistant',
+          errorMessage.content,
+          errorMessage.metadata
+        ).catch(console.error);
+        
+        // Clear streaming state
+        setStreamingMessage(null);
+        setIsLoading(false);
+        setThinkingMessage('');
+      }
+    };
 
     try {
-      // Save user message to session (async, don't wait)
-      SessionService.addMessage(currentSession.id, 'user', currentInput).catch(console.error);
-      
-      // Process message and get responses
-      const responses = await ChatService.processMessage(currentInput);
-      const finalMessages = [...updatedMessages, ...responses];
-      setMessages(finalMessages);
-      
-      // Update cache
-      messageCache.current.set(currentSession.id, finalMessages);
-      
-      // Save assistant responses to session (async, don't wait)
-      for (const response of responses) {
-        SessionService.addMessage(
-          currentSession.id, 
-          response.type as Message['role'], 
-          response.content,
-          response.metadata
-        ).catch(console.error);
-      }
-      
+      // Start streaming
+      await ChatService.processMessageWithStreaming(currentInput, streamingCallbacks);
     } catch (error) {
-      const errorMessage = ChatService.createMessage(
-        'assistant',
-        `❌ **Error:** ${error instanceof Error ? error.message : 'Something went wrong'}`,
-        { error: true }
-      );
-      const finalMessages = [...updatedMessages, errorMessage];
-      setMessages(finalMessages);
+      console.error('❌ Streaming failed, falling back to regular processing:', error);
       
-      // Update cache
-      messageCache.current.set(currentSession.id, finalMessages);
+      // Fallback to regular processing
+      setStreamingMessage(null);
+      setThinkingMessage('Processing request...');
       
-      // Save error message to session if session exists (async)
-      if (currentSession) {
+      try {
+        const responses = await ChatService.processMessage(currentInput);
+        const finalMessages = [...updatedMessages, ...responses];
+        setMessages(finalMessages);
+        
+        // Update cache
+        messageCache.current.set(currentSession.id, finalMessages);
+        
+        // Save responses to session
+        for (const response of responses) {
+          SessionService.addMessage(
+            currentSession.id,
+            response.type as Message['role'],
+            response.content,
+            response.metadata
+          ).catch(console.error);
+        }
+        
+      } catch (fallbackError) {
+        const errorMessage = ChatService.createMessage(
+          'assistant',
+          `❌ **Error:** ${fallbackError instanceof Error ? fallbackError.message : 'Something went wrong'}`,
+          { error: true }
+        );
+        
+        const finalMessages = [...updatedMessages, errorMessage];
+        setMessages(finalMessages);
+        messageCache.current.set(currentSession.id, finalMessages);
+        
         SessionService.addMessage(
           currentSession.id,
           'assistant',
@@ -201,16 +388,10 @@ export default function Chat() {
           errorMessage.metadata
         ).catch(console.error);
       }
-    } finally {
-      clearInterval(thinkingInterval);
+      
       setIsLoading(false);
       setThinkingMessage('');
     }
-
-    // Auto-scroll to bottom
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
   };
 
   const handleNewSession = async () => {
@@ -402,8 +583,24 @@ export default function Chat() {
           windowSize={10}
         />
         
+        {/* Streaming Message */}
+        {streamingMessage && (
+          <StreamingMessage
+            content={streamingMessage.content}
+            isStreaming={streamingMessage.isStreaming}
+            toolName={streamingMessage.toolName}
+            toolStatus={streamingMessage.toolStatus}
+            onStreamComplete={() => {
+              // Auto-scroll when streaming completes
+              setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+              }, 100);
+            }}
+          />
+        )}
+        
         {/* Thinking Animation */}
-        <ThinkingAnimation visible={isLoading} message={thinkingMessage} />
+        <ThinkingAnimation visible={isLoading && !!thinkingMessage} message={thinkingMessage} />
         
         {messages.length <= 1 && (
           <View style={styles.suggestionsContainer}>

@@ -3,6 +3,7 @@ import { MCPService } from './mcpService';
 import { MCPTestService } from './mcpTest';
 import { TokenDebugger } from './debugTokens';
 import { AIService } from './aiService';
+import { StreamingService, StreamingCallbacks } from './streamingService';
 
 export class ChatService {
   private static responseCache = new Map<string, any>();
@@ -38,6 +39,82 @@ export class ChatService {
       if (now - value.timestamp > this.cacheTimeout) {
         this.responseCache.delete(key);
       }
+    }
+  }
+
+  /**
+   * Process message with streaming
+   */
+  static async processMessageWithStreaming(
+    userMessage: string, 
+    callbacks: StreamingCallbacks
+  ): Promise<void> {
+    console.log('🌊 Starting streaming for:', userMessage);
+    
+    // Check cache for repeated queries first (excluding commands)
+    if (!userMessage.startsWith('/')) {
+      const cachedResponse = this.getCachedResponse(userMessage);
+      if (cachedResponse) {
+        console.log('📋 Using cached response for streaming query:', userMessage);
+        // Simulate streaming for cached responses
+        callbacks.onStart?.({ query: userMessage, cached: true });
+        
+        // Find the main assistant response
+        const assistantResponse = cachedResponse.find((r: any) => r.type === 'assistant');
+        if (assistantResponse) {
+          callbacks.onResponseChunk?.({ 
+            chunk: assistantResponse.content, 
+            isComplete: true 
+          });
+        }
+        
+        callbacks.onComplete?.({ 
+          success: true, 
+          cached: true,
+          responses: cachedResponse,
+          toolUsed: assistantResponse?.metadata?.toolName,
+          rawData: assistantResponse?.metadata?.toolData,
+          reasoning: assistantResponse?.metadata?.reasoning
+        });
+        return;
+      }
+    }
+
+    // For now, fall back to regular processing for ALL queries to fix the issue
+    // TODO: Re-enable streaming once debugging is complete
+    console.log('🔄 Using fallback processing for:', userMessage);
+    
+    callbacks.onStart?.({ query: userMessage, fallback: true });
+    
+    try {
+      const responses = await this.processMessage(userMessage);
+      console.log('✅ Got responses:', responses.length);
+      
+      if (responses.length > 0) {
+        // Send the main assistant response as streaming chunks
+        const assistantResponse = responses.find(r => r.type === 'assistant');
+        if (assistantResponse) {
+          // Simulate streaming by sending the complete response
+          callbacks.onResponseChunk?.({ 
+            chunk: assistantResponse.content, 
+            isComplete: true 
+          });
+        }
+        
+        callbacks.onComplete?.({ 
+          success: true, 
+          responses,
+          toolUsed: assistantResponse?.metadata?.toolName,
+          rawData: assistantResponse?.metadata?.toolData,
+          reasoning: assistantResponse?.metadata?.reasoning
+        });
+      } else {
+        callbacks.onError?.('No response generated');
+      }
+      
+    } catch (error) {
+      console.error('❌ Fallback processing error:', error);
+      callbacks.onError?.(error instanceof Error ? error.message : 'Processing failed');
     }
   }
 
@@ -209,7 +286,7 @@ export class ChatService {
         }
       } catch (error) {
         console.error('❌ AI processing error:', error);
-        console.error('❌ Error details:', error.message);
+        console.error('❌ Error details:', error instanceof Error ? error.message : 'Unknown error');
         // Fall back to simple response on error
         responses.push(this.createMessage(
           'assistant',
