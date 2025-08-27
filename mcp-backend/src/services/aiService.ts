@@ -6,6 +6,8 @@ export class AIService {
   private genAI: GoogleGenerativeAI;
   private model: any;
   private toolRegistry: MCPToolRegistry;
+  private responseCache: Map<string, any> = new Map();
+  private cacheTimeout = 5 * 60 * 1000; // 5 minutes
 
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -177,7 +179,7 @@ Guidelines:
   }
 
   /**
-   * Execute the selected MCP tool
+   * Execute the selected MCP tool with caching
    */
   private async executeTool(selection: AIToolSelection, userId: string): Promise<any> {
     const tool = this.toolRegistry.getTool(selection.tool);
@@ -185,9 +187,44 @@ Guidelines:
       throw new Error(`Tool ${selection.tool} not found`);
     }
 
+    // Create cache key
+    const cacheKey = `${selection.tool}_${userId}_${JSON.stringify(selection.parameters)}`;
+    
+    // Check cache for non-real-time tools
+    const cachedData = this.responseCache.get(cacheKey);
+    if (cachedData && Date.now() - cachedData.timestamp < this.cacheTimeout) {
+      console.log('📋 Using cached result for tool:', selection.tool);
+      return cachedData.result;
+    }
+
     console.log('🔧 Executing tool:', selection.tool, 'with params:', selection.parameters);
     
-    return await tool.execute(userId, selection.parameters);
+    const result = await tool.execute(userId, selection.parameters);
+    
+    // Cache the result
+    this.responseCache.set(cacheKey, {
+      result,
+      timestamp: Date.now()
+    });
+    
+    // Clean old cache entries periodically
+    if (this.responseCache.size > 100) {
+      this.cleanCache();
+    }
+    
+    return result;
+  }
+
+  /**
+   * Clean expired cache entries
+   */
+  private cleanCache(): void {
+    const now = Date.now();
+    for (const [key, value] of this.responseCache.entries()) {
+      if (now - value.timestamp > this.cacheTimeout) {
+        this.responseCache.delete(key);
+      }
+    }
   }
 
   /**

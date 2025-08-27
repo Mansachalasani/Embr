@@ -79,6 +79,11 @@ console.log(res,'client res')
     return this.executeTool('getLastTenMails');
   }
 
+  static async getEmails(params: any = {}): Promise<MCPResponse> {
+    console.log('📧 Fetching emails with params:', params);
+    return this.executeTool('getEmails', params);
+  }
+
   static async getAuthStatus(): Promise<MCPResponse> {
     try {
       return await this.makeRequest('/auth/status');

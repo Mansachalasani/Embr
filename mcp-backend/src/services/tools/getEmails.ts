@@ -94,7 +94,8 @@ export const getEmailsToolDefinition: MCPTool = {
 
       // Fetch details for each message based on format
       const detailedMessages: EmailMessage[] = [];
-      const batchSize = 10; // Process in batches for better performance
+      // Optimize batch size based on format - smaller batches for full content
+      const batchSize = format === 'full' && includeBody ? 5 : 15;
       
       for (let i = 0; i < messages.length; i += batchSize) {
         const batch = messages.slice(i, i + batchSize);

@@ -5,8 +5,40 @@ import { TokenDebugger } from './debugTokens';
 import { AIService } from './aiService';
 
 export class ChatService {
+  private static responseCache = new Map<string, any>();
+  private static cacheTimeout = 2 * 60 * 1000; // 2 minutes for chat cache
+  
   static generateId(): string {
     return Date.now().toString() + Math.random().toString(36).substring(2);
+  }
+  
+  static getCachedResponse(query: string): any | null {
+    const cached = this.responseCache.get(query.toLowerCase().trim());
+    if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+      return cached.response;
+    }
+    return null;
+  }
+  
+  static setCachedResponse(query: string, response: any): void {
+    this.responseCache.set(query.toLowerCase().trim(), {
+      response,
+      timestamp: Date.now()
+    });
+    
+    // Clean cache periodically
+    if (this.responseCache.size > 50) {
+      this.cleanCache();
+    }
+  }
+  
+  static cleanCache(): void {
+    const now = Date.now();
+    for (const [key, value] of this.responseCache.entries()) {
+      if (now - value.timestamp > this.cacheTimeout) {
+        this.responseCache.delete(key);
+      }
+    }
   }
 
   static createMessage(
@@ -24,6 +56,15 @@ export class ChatService {
   }
 
   static async processMessage(userMessage: string): Promise<ChatMessage[]> {
+    // Check cache for repeated queries first (excluding commands)
+    if (!userMessage.startsWith('/')) {
+      const cachedResponse = this.getCachedResponse(userMessage);
+      if (cachedResponse) {
+        console.log('📋 Using cached response for query:', userMessage);
+        return cachedResponse;
+      }
+    }
+    
     const responses: ChatMessage[] = [];
     
     // Check if it's a command
@@ -44,7 +85,7 @@ export class ChatService {
           
         case '/emails':
           responses.push(this.createMessage('system', 'Fetching your latest emails...', { loading: true }));
-          const emailResult = await MCPService.getLastTenMails();
+          const emailResult = await MCPService.getEmails();
           responses.push(this.processEmailResponse(emailResult));
           break;
           
@@ -177,6 +218,11 @@ export class ChatService {
       }
     }
     
+    // Cache non-command responses
+    if (!userMessage.startsWith('/') && responses.length > 0) {
+      this.setCachedResponse(userMessage, responses);
+    }
+    
     return responses;
   }
 
@@ -253,7 +299,7 @@ export class ChatService {
       return this.createMessage(
         'assistant',
         `❌ **Email Error:** ${result.error}\n\nMake sure your Gmail is connected and try again.`,
-        { error: true, toolName: 'getLastTenMails' }
+        { error: true, toolName: 'getEmails' }
       );
     }
 
@@ -263,21 +309,35 @@ export class ChatService {
       return this.createMessage(
         'assistant',
         `📧 **No recent emails found**\n\nYour inbox appears to be empty.`,
-        { toolName: 'getLastTenMails', toolData: result.data }
+        { toolName: 'getEmails', toolData: result.data }
       );
     }
 
     let response = `📧 **Latest Emails**\n\n`;
-    response += `**Summary:** ${summary.total} messages, ${summary.unread} unread\n\n`;
+    response += `**Summary:** ${summary.total} messages, ${summary.unread} unread`;
+    if (summary.important > 0) response += `, ${summary.important} important`;
+    if (summary.starred > 0) response += `, ${summary.starred} starred`;
+    if (summary.withAttachments > 0) response += `, ${summary.withAttachments} with attachments`;
+    response += '\n\n';
     
     messages.slice(0, 5).forEach((email: any) => {
       const date = new Date(email.date).toLocaleDateString();
       const unreadIcon = email.unread ? '🔵 ' : '';
+      const importantIcon = email.important ? '⭐ ' : '';
+      const starredIcon = email.starred ? '🌟 ' : '';
+      const attachmentIcon = email.attachments && email.attachments.length > 0 ? '📎 ' : '';
       
-      response += `${unreadIcon}**${email.subject}**\n`;
+      response += `${unreadIcon}${importantIcon}${starredIcon}${attachmentIcon}**${email.subject}**\n`;
       response += `👤 ${email.from}\n`;
+      if (email.cc && email.cc.length > 0) {
+        response += `CC: ${email.cc.slice(0, 2).join(', ')}${email.cc.length > 2 ? ` +${email.cc.length - 2} more` : ''}\n`;
+      }
       response += `📅 ${date}\n`;
-      response += `💬 ${email.snippet}\n\n`;
+      response += `💬 ${email.snippet || email.body || 'No preview available'}\n`;
+      if (email.attachments && email.attachments.length > 0) {
+        response += `📎 ${email.attachments.length} attachment${email.attachments.length > 1 ? 's' : ''}\n`;
+      }
+      response += '\n';
     });
 
     if (messages.length > 5) {
@@ -287,7 +347,7 @@ export class ChatService {
     return this.createMessage(
       'assistant',
       response,
-      { toolName: 'getLastTenMails', toolData: result.data }
+      { toolName: 'getEmails', toolData: result.data }
     );
   }
 
