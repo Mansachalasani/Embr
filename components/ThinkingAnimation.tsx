@@ -131,7 +131,7 @@ export const ThinkingAnimation: React.FC<ThinkingAnimationProps> = ({
           },
         ]}
       >
-        <Ionicons name="bulb-outline" size={24} color="#4285F4" />
+        <Ionicons name="bulb" size={24} color="#4285F4" />
       </Animated.View>
       
       <View style={styles.contentContainer}>

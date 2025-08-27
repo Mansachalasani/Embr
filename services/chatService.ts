@@ -4,6 +4,7 @@ import { MCPTestService } from './mcpTest';
 import { TokenDebugger } from './debugTokens';
 import { AIService } from './aiService';
 import { StreamingService, StreamingCallbacks } from './streamingService';
+import { DeepLinkingService } from './deepLinkingService';
 
 export class ChatService {
   private static responseCache = new Map<string, any>();
@@ -228,62 +229,85 @@ export class ChatService {
           ));
       }
     } else {
-      // Handle regular chat messages with AI
+      // Handle regular chat messages - Check for deep linking first
       console.log('🤖 Processing natural language query:', userMessage);
       responses.push(this.createMessage('system', 'Processing your request...', { loading: true }));
       
       try {
-        // Check if AI is available
-        console.log('🔍 Checking AI availability...');
-        const aiAvailable = await AIService.checkAIAvailability();
-        console.log('🔍 AI Available:', aiAvailable);
+        // Check if this is a deep link query first
+        console.log('🔗 Checking for deep link actions...');
+        const isDeepLinkQuery = DeepLinkingService.isDeepLinkQuery(userMessage);
         
-        if (aiAvailable) {
-          // Use AI to process natural language query
-          console.log('🧠 Sending query to AI service...');
-          const aiResponse = await AIService.processQuery({
-            query: userMessage,
-            preferences: {
-              responseStyle: 'conversational',
-              includeActions: true
-            }
-          });
+        if (isDeepLinkQuery) {
+          console.log('🔗 Processing deep link query:', userMessage);
+          const deepLinkResult = await DeepLinkingService.processDeepLinkQuery(userMessage);
           
-          console.log('🧠 AI Response:', aiResponse);
-          
-          if (aiResponse.success && aiResponse.data) {
+          if (deepLinkResult.success) {
             responses.push(this.createMessage(
               'assistant',
-              aiResponse.data.response,
-              {
-                toolName: aiResponse.data.toolUsed,
-                toolData: aiResponse.data.rawData
-              }
+              `🔗 **Deep Link Action**\n\n${deepLinkResult.message}\n\nI've opened the ${deepLinkResult.action} for you!`,
+              { toolName: 'deepLink', toolData: deepLinkResult }
             ));
+          } else {
+            responses.push(this.createMessage(
+              'assistant',
+              `🔗 **Deep Link Action**\n\n${deepLinkResult.message}\n\nYou can try:\n• "Call +1234567890"\n• "Open Amazon and show me shoes under $100"\n• "Play some music on Spotify"\n• "Navigate to Central Park"`,
+              { error: true, toolName: 'deepLink' }
+            ));
+          }
+        } else {
+          // Check if AI is available for regular processing
+          console.log('🔍 Checking AI availability...');
+          const aiAvailable = await AIService.checkAIAvailability();
+          console.log('🔍 AI Available:', aiAvailable);
+        
+          if (aiAvailable) {
+            // Use AI to process natural language query
+            console.log('🧠 Sending query to AI service...');
+            const aiResponse = await AIService.processQuery({
+              query: userMessage,
+              preferences: {
+                responseStyle: 'conversational',
+                includeActions: true
+              }
+            });
             
-            // Add suggested actions if available
-            if (aiResponse.data.suggestedActions && aiResponse.data.suggestedActions.length > 0) {
+            console.log('🧠 AI Response:', aiResponse);
+            
+            if (aiResponse.success && aiResponse.data) {
               responses.push(this.createMessage(
-                'system',
-                `💡 **Suggestions:**\n${aiResponse.data.suggestedActions.map(action => `• ${action}`).join('\n')}`,
-                { toolName: 'suggestions' }
+                'assistant',
+                aiResponse.data.response,
+                {
+                  toolName: aiResponse.data.toolUsed,
+                  toolData: aiResponse.data.rawData
+                }
+              ));
+              
+              // Add suggested actions if available
+              if (aiResponse.data.suggestedActions && aiResponse.data.suggestedActions.length > 0) {
+                responses.push(this.createMessage(
+                  'system',
+                  `💡 **Suggestions:**\n${aiResponse.data.suggestedActions.map(action => `• ${action}`).join('\n')}`,
+                  { toolName: 'suggestions' }
+                ));
+              }
+            } else {
+              // AI failed, fall back to simple response
+              console.log('❌ AI query failed:', aiResponse.error);
+              responses.push(this.createMessage(
+                'assistant',
+                `I received your message: "${userMessage}". I can help you with your calendar and emails using commands like /calendar or /emails. Type /help for more options.`
               ));
             }
           } else {
-            // AI failed, fall back to simple response
-            console.log('❌ AI query failed:', aiResponse.error);
+            // AI not available, use fallback
             responses.push(this.createMessage(
               'assistant',
               `I received your message: "${userMessage}". I can help you with your calendar and emails using commands like /calendar or /emails. Type /help for more options.`
             ));
           }
-        } else {
-          // AI not available, use fallback
-          responses.push(this.createMessage(
-            'assistant',
-            `I received your message: "${userMessage}". I can help you with your calendar and emails using commands like /calendar or /emails. Type /help for more options.`
-          ));
-        }
+        } // End of deep link else block
       } catch (error) {
         console.error('❌ AI processing error:', error);
         console.error('❌ Error details:', error instanceof Error ? error.message : 'Unknown error');

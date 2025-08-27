@@ -1,16 +1,44 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  StyleSheet, 
+  Alert, 
+  ScrollView, 
+  Dimensions,
+  Animated,
+  Image
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { signInWithGoogle } from '../../services/auth-simple';
-import { router } from 'expo-router';
-import AuthDebug from '../../components/AuthDebug';
-import { AuthDebugger } from '../../utils/authDebugger';
-import { testManualSession, testDirectAuth } from '../../services/auth-test';
-import { signInWithGoogleFallback, signInWithSupabaseDirect } from '../../services/auth-fallback';
-import { supabase } from '../../lib/supabase';
+import { useTheme } from '../../contexts/ThemeContext';
+
+const { width, height } = Dimensions.get('window');
 
 export default function SignIn() {
+  const { colors, isDark } = useTheme();
   const [loading, setLoading] = useState(false);
+  const fadeAnim = new Animated.Value(0);
+  const slideAnim = new Animated.Value(50);
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   const handleGoogleSignIn = async () => {
     try {
@@ -22,7 +50,6 @@ export default function SignIn() {
       
       if (result.type === 'success') {
         console.log('✅ Sign in successful! AuthContext will handle redirect.');
-        // await supabase.from("user_profiles").upsert({ id: result.user.id, email: result.user.email,google_refresh_token: result.provider_refresh_token || "" });
       } else if (result.type === 'cancel') {
         console.log('⚠️ User cancelled sign in');
         Alert.alert('Cancelled', 'Sign in was cancelled');
@@ -39,170 +66,264 @@ export default function SignIn() {
     }
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    gradient: {
+      flex: 1,
+    },
+    content: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 32,
+    },
+    header: {
+      alignItems: 'center',
+      marginBottom: 60,
+    },
+    logoContainer: {
+      width: 120,
+      height: 120,
+      borderRadius: 60,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 24,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.3,
+      shadowRadius: 16,
+      elevation: 8,
+    },
+    logoText: {
+      fontSize: 48,
+      fontWeight: '800',
+    },
+    appName: {
+      fontSize: 42,
+      fontWeight: '800',
+      color: colors.text,
+      marginBottom: 16,
+      textAlign: 'center',
+    },
+    tagline: {
+      fontSize: 18,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginBottom: 8,
+      fontWeight: '500',
+    },
+    subtitle: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 24,
+    },
+    featuresContainer: {
+      marginVertical: 40,
+      width: '100%',
+    },
+    feature: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 20,
+      paddingHorizontal: 8,
+    },
+    featureIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 16,
+    },
+    featureText: {
+      flex: 1,
+    },
+    featureTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 4,
+    },
+    featureDescription: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      lineHeight: 20,
+    },
+    signInContainer: {
+      width: '100%',
+      marginTop: 20,
+    },
+    googleButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 16,
+      paddingHorizontal: 32,
+      borderRadius: 16,
+      marginBottom: 16,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      elevation: 6,
+    },
+    googleButtonContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    googleButtonText: {
+      color: '#fff',
+      fontSize: 18,
+      fontWeight: '600',
+      marginLeft: 12,
+    },
+    buttonDisabled: {
+      opacity: 0.7,
+    },
+    footer: {
+      alignItems: 'center',
+      paddingVertical: 32,
+    },
+    footerText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+  });
+
+  const features = [
+    {
+      icon: 'chatbubbles',
+      title: 'Smart Conversations',
+      description: 'Chat with your AI assistant powered by advanced language models'
+    },
+    {
+      icon: 'calendar',
+      title: 'Calendar Integration',
+      description: 'Manage your schedule with seamless Google Calendar integration'
+    },
+    {
+      icon: 'mail',
+      title: 'Email Management',
+      description: 'Get intelligent email summaries and quick responses'
+    },
+    {
+      icon: 'apps',
+      title: 'Deep Linking',
+      description: 'Connect with external apps like Spotify, Amazon, and more'
+    }
+  ];
+
   return (
-    <ScrollView style={styles.container}>
-      <StatusBar style="dark" />
-      
-      <AuthDebug />
-      
-      <View style={styles.content}>
-        <Text style={styles.title}>Welcome</Text>
-        <Text style={styles.subtitle}>Sign in to continue</Text>
-        
-        <TouchableOpacity 
-          style={[styles.googleButton, loading && styles.buttonDisabled]} 
-          onPress={handleGoogleSignIn}
-          disabled={loading}
-        >
-          <Text style={styles.googleButtonText}>
-            {loading ? 'Signing in...' : 'Sign in with Google'}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Debug Buttons */}
-        <View style={styles.debugSection}>
-          <Text style={styles.debugTitle}>🔧 Debug Tools</Text>
-          
-          <TouchableOpacity 
-            style={styles.debugButton} 
-            onPress={() => AuthDebugger.fullDiagnostic()}
-          >
-            <Text style={styles.debugButtonText}>Run Full Diagnostic</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.debugButton} 
-            onPress={() => AuthDebugger.testOAuthURL()}
-          >
-            <Text style={styles.debugButtonText}>Test OAuth URL</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.debugButton} 
-            onPress={() => testDirectAuth()}
-          >
-            <Text style={styles.debugButtonText}>Test Direct Auth</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.debugButton} 
-            onPress={() => testManualSession()}
-          >
-            <Text style={styles.debugButtonText}>Test Manual Session</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.debugButton, { backgroundColor: '#28a745' }]} 
-            onPress={async () => {
-              setLoading(true);
-              try {
-                await signInWithGoogleFallback();
-              } catch (err) {
-                console.error('Fallback failed:', err);
+    <LinearGradient colors={colors.gradientBackground} style={styles.container}>
+      <SafeAreaView style={styles.gradient}>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <Animated.View 
+            style={[
+              styles.header,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
               }
-              setLoading(false);
-            }}
-            disabled={loading}
+            ]}
           >
-            <Text style={styles.debugButtonText}>Try Fallback Method</Text>
-          </TouchableOpacity>
+            {/* Logo */}
+            <LinearGradient
+              colors={colors.gradientPrimary}
+              style={styles.logoContainer}
+            >
+              <Text style={[styles.logoText, { color: '#fff' }]}>🔥</Text>
+            </LinearGradient>
 
-          <TouchableOpacity 
-            style={[styles.debugButton, { backgroundColor: '#17a2b8' }]} 
-            onPress={async () => {
-              setLoading(true);
-              try {
-                await signInWithSupabaseDirect();
-              } catch (err) {
-                console.error('Direct method failed:', err);
+            {/* App Name & Tagline */}
+            <Text style={styles.appName}>Embr</Text>
+            <Text style={styles.tagline}>Your AI Assistant with Fire</Text>
+            <Text style={styles.subtitle}>
+              Ignite productivity with intelligent conversations,{'\n'}
+              seamless integrations, and powerful automation
+            </Text>
+          </Animated.View>
+
+          {/* Features */}
+          <Animated.View 
+            style={[
+              styles.featuresContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
               }
-              setLoading(false);
-            }}
-            disabled={loading}
+            ]}
           >
-            <Text style={styles.debugButtonText}>Try Direct Method</Text>
-          </TouchableOpacity>
+            {features.map((feature, index) => (
+              <View key={index} style={styles.feature}>
+                <LinearGradient
+                  colors={[colors.primary + '20', colors.secondary + '20']}
+                  style={styles.featureIcon}
+                >
+                  <Ionicons name={feature.icon as any} size={24} color={colors.primary} />
+                </LinearGradient>
+                <View style={styles.featureText}>
+                  <Text style={styles.featureTitle}>{feature.title}</Text>
+                  <Text style={styles.featureDescription}>{feature.description}</Text>
+                </View>
+              </View>
+            ))}
+          </Animated.View>
 
-          <TouchableOpacity 
-            style={[styles.debugButton, styles.clearButton]} 
-            onPress={() => AuthDebugger.clearAllAuth()}
+          {/* Sign In Button */}
+          <Animated.View 
+            style={[
+              styles.signInContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
           >
-            <Text style={styles.debugButtonText}>Clear All Auth</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </ScrollView>
+            <TouchableOpacity 
+              onPress={handleGoogleSignIn}
+              disabled={loading}
+              activeOpacity={0.9}
+            >
+              <LinearGradient
+                colors={colors.gradientPrimary}
+                style={[styles.googleButton, loading && styles.buttonDisabled]}
+              >
+                <View style={styles.googleButtonContent}>
+                  <Ionicons 
+                    name="logo-google" 
+                    size={24} 
+                    color="#fff" 
+                  />
+                  <Text style={styles.googleButtonText}>
+                    {loading ? 'Signing in...' : 'Continue with Google'}
+                  </Text>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* Footer */}
+          <Animated.View 
+            style={[
+              styles.footer,
+              {
+                opacity: fadeAnim,
+              }
+            ]}
+          >
+            <Text style={styles.footerText}>
+              By signing in, you agree to our Terms of Service{'\n'}
+              and Privacy Policy. Welcome to the future! 🚀
+            </Text>
+          </Animated.View>
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 40,
-  },
-  googleButton: {
-    backgroundColor: '#4285F4',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 8,
-    minWidth: 200,
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  buttonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  googleButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  debugSection: {
-    marginTop: 40,
-    padding: 20,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 10,
-  },
-  debugTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  debugButton: {
-    backgroundColor: '#6c757d',
-    padding: 12,
-    borderRadius: 6,
-    marginBottom: 10,
-    alignItems: 'center',
-  },
-  clearButton: {
-    backgroundColor: '#dc3545',
-  },
-  debugButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-});

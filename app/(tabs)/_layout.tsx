@@ -1,10 +1,12 @@
 import React from 'react';
 import { Tabs, Redirect } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function TabLayout() {
   const { user } = useAuth();
+  const { colors } = useTheme();
 
   if (!user) {
     return <Redirect href="/(auth)" />;
@@ -13,49 +15,56 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#4285F4',
-        tabBarInactiveTintColor: '#8e8e93',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textSecondary,
         headerShown: true,
         headerStyle: {
-          backgroundColor: '#f8f9fa',
+          backgroundColor: colors.surface,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
         },
         headerTitleStyle: {
-          fontWeight: '600',
+          fontWeight: '700',
+          color: colors.text,
+          fontSize: 20,
         },
         tabBarStyle: {
-          backgroundColor: '#fff',
+          backgroundColor: colors.surface,
           borderTopWidth: 1,
-          borderTopColor: '#e1e1e1',
+          borderTopColor: colors.border,
+          paddingTop: 8,
+          paddingBottom: 8,
+          height: 88,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
         },
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="chat"
         options={{
-          title: 'Home',
-          headerTitle: 'Home',
+          title: 'Chat',
+          headerTitle: '🔥 Chat with Embr',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" color={color} size={size} />
+            <Ionicons name="chatbubbles" color={color} size={size} />
           ),
         }}
       />
       <Tabs.Screen
-        name="chat"
+        name="index"
         options={{
-          title: 'MCP Chat',
-          headerTitle: 'MCP Assistant',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubble-outline" color={color} size={size} />
-          ),
+          href: null, // Hide this tab but keep it for redirect
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          headerTitle: 'Profile',
+          headerTitle: '👤 Profile',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" color={color} size={size} />
+            <Ionicons name="person-circle" color={color} size={size} />
           ),
         }}
       />
@@ -63,9 +72,9 @@ export default function TabLayout() {
         name="settings"
         options={{
           title: 'Settings',
-          headerTitle: 'Settings',
+          headerTitle: '⚙️ Settings',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings-outline" color={color} size={size} />
+            <Ionicons name="settings" color={color} size={size} />
           ),
         }}
       />

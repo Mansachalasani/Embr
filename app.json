@@ -1,17 +1,17 @@
 {
   "expo": {
-    "name": "SupabaseAuthApp",
-    "slug": "SupabaseAuthApp",
+    "name": "Embr",
+    "slug": "embr-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "scheme": "supabaseauthapp",
+    "scheme": "embr",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0D1117"
     },
     "ios": {
       "supportsTablet": true

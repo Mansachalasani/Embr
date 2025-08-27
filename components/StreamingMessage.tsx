@@ -80,7 +80,7 @@ export const StreamingMessage: React.FC<StreamingMessageProps> = ({
 
   const getToolIcon = (tool?: string, status?: string) => {
     if (status === 'executing' || status === 'analyzing') {
-      return <Ionicons name="hourglass-outline" size={14} color="#4285F4" />;
+      return <Ionicons name="hourglass" size={14} color="#4285F4" />;
     }
     
     switch (tool) {
@@ -90,7 +90,7 @@ export const StreamingMessage: React.FC<StreamingMessageProps> = ({
       case 'getLastTenMails':
         return <MaterialIcons name="email" size={14} color="#4285F4" />;
       default:
-        return <Ionicons name="construct-outline" size={14} color="#4285F4" />;
+        return <Ionicons name="construct" size={14} color="#4285F4" />;
     }
   };
 

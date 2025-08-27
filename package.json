@@ -16,6 +16,7 @@
     "expo": "~53.0.22",
     "expo-auth-session": "^6.2.1",
     "expo-crypto": "^14.1.5",
+    "expo-linear-gradient": "^14.1.5",
     "expo-router": "^5.1.4",
     "expo-status-bar": "~2.2.3",
     "expo-web-browser": "^14.2.0",

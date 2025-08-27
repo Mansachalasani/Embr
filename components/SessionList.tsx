@@ -11,8 +11,10 @@ import {
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SessionService } from '../services/sessionService';
 import { SessionWithStats } from '../types/session';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface SessionListProps {
   onSelectSession: (sessionId: string) => void;
@@ -25,6 +27,7 @@ export const SessionList: React.FC<SessionListProps> = ({
   currentSessionId,
   onNewSession,
 }) => {
+  const { colors } = useTheme();
   const [sessions, setSessions] = useState<SessionWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -38,10 +41,12 @@ export const SessionList: React.FC<SessionListProps> = ({
   const loadSessions = async () => {
     try {
       setLoading(true);
+      console.log('🔄 Loading sessions...');
       const userSessions = await SessionService.getUserSessions();
+      console.log('✅ Loaded sessions:', userSessions.length, 'sessions');
       setSessions(userSessions);
     } catch (error) {
-      console.error('Error loading sessions:', error);
+      console.error('❌ Error loading sessions:', error);
       Alert.alert('Error', 'Failed to load sessions');
     } finally {
       setLoading(false);
@@ -143,7 +148,7 @@ export const SessionList: React.FC<SessionListProps> = ({
           onPress={() => handleDeleteSession(item.id, item.title)}
           style={styles.deleteButton}
         >
-          <Ionicons name="trash-outline" size={16} color="#666" />
+          <Ionicons name="trash" size={16} color="#666" />
         </TouchableOpacity>
       </View>
       
@@ -156,7 +161,7 @@ export const SessionList: React.FC<SessionListProps> = ({
           {formatDate(item.updated_at)}
         </Text>
         <View style={styles.sessionStats}>
-          <Ionicons name="chatbubble-outline" size={12} color="#666" />
+          <Ionicons name="chatbubble" size={12} color="#666" />
           <Text style={styles.messageCount}>{item.message_count}</Text>
         </View>
       </View>
@@ -186,7 +191,7 @@ export const SessionList: React.FC<SessionListProps> = ({
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="chatbubbles-outline" size={48} color="#999" />
+            <Ionicons name="chatbubbles" size={48} color="#999" />
             <Text style={styles.emptyText}>No conversations yet</Text>
             <Text style={styles.emptySubtext}>
               Start a new chat to see it here
