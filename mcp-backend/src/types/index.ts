@@ -45,10 +45,21 @@ export interface EmailMessage {
   subject: string;
   from: string;
   to: string[];
+  cc?: string[];
+  bcc?: string[];
   date: string;
   snippet: string;
   body?: string;
   unread: boolean;
+  important?: boolean;
+  starred?: boolean;
+  labels?: string[];
+  attachments?: Array<{
+    name: string;
+    mimeType: string;
+    size?: number;
+  }>;
+  sizeEstimate?: number;
 }
 
 export interface MCPTool {

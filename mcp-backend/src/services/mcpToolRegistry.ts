@@ -1,7 +1,7 @@
 import { MCPTool, MCPToolResponse } from '../types';
 import { AIToolMetadata } from '../types/aiTools';
 import { getTodaysEventsToolDefinition } from './tools/getTodaysEvents';
-import { getLastTenMailsToolDefinition } from './tools/getLastTenMails';
+import { getEmailsToolDefinition } from './tools/getEmails';
 
 export class MCPToolRegistry {
   private static instance: MCPToolRegistry;
@@ -60,50 +60,95 @@ export class MCPToolRegistry {
       dataAccess: 'read'
     });
 
-    // Register getLastTenMails with AI metadata
-    this.registerToolWithMetadata('getLastTenMails', getLastTenMailsToolDefinition, {
-      name: 'getLastTenMails',
-      description: 'Retrieves the 10 most recent emails from Gmail inbox, including sender, subject, date, and snippet',
+    // Register getEmails with AI metadata
+    this.registerToolWithMetadata('getEmails', getEmailsToolDefinition, {
+      name: 'getEmails',
+      description: 'Comprehensive Gmail email retrieval with advanced search, filtering, and customizable parameters including date ranges, labels, format options, and body content',
       category: 'email',
       parameters: [
         {
           name: 'maxResults',
           type: 'number',
-          description: 'Maximum number of emails to retrieve (default: 10, max: 50)',
+          description: 'Maximum number of emails to retrieve (default: 20, max: 100)',
           required: false,
-          examples: ['5', '20']
+          examples: ['10', '50', '100']
         },
         {
           name: 'query',
           type: 'string',
-          description: 'Gmail search query to filter emails (e.g., "from:john@example.com", "subject:urgent")',
+          description: 'Gmail search query supporting full Gmail search syntax (from:, subject:, is:unread, etc.)',
           required: false,
-          examples: ['from:boss@company.com', 'subject:meeting', 'is:unread']
+          examples: ['from:boss@company.com', 'subject:meeting', 'is:unread', 'has:attachment']
+        },
+        {
+          name: 'includeSpamTrash',
+          type: 'boolean',
+          description: 'Include emails from spam and trash folders (default: false)',
+          required: false,
+          examples: ['true', 'false']
+        },
+        {
+          name: 'labelIds',
+          type: 'array',
+          description: 'Specific Gmail labels to search in (e.g., ["INBOX", "IMPORTANT"])',
+          required: false,
+          examples: ['["INBOX"]', '["IMPORTANT", "STARRED"]']
+        },
+        {
+          name: 'format',
+          type: 'string',
+          description: 'Level of detail to retrieve: "full" (complete), "metadata" (headers only), "minimal" (basic info)',
+          required: false,
+          examples: ['full', 'metadata', 'minimal']
+        },
+        {
+          name: 'includeBody',
+          type: 'boolean',
+          description: 'Whether to include email body content (default: true)',
+          required: false,
+          examples: ['true', 'false']
+        },
+        {
+          name: 'dateRange',
+          type: 'object',
+          description: 'Date range filter with after/before dates in YYYY/MM/DD format',
+          required: false,
+          examples: ['{"after":"2024/01/01"}', '{"before":"2024/12/31"}', '{"after":"2024/01/01","before":"2024/01/31"}']
         }
       ],
       examples: [
         {
           query: "Check my emails",
           expectedParams: {},
-          description: "Get latest 10 emails"
+          description: "Get recent emails from inbox"
         },
         {
-          query: "Do I have any new messages?",
-          expectedParams: {},
-          description: "Get recent emails to check for new ones"
+          query: "Show me unread emails",
+          expectedParams: { query: "is:unread" },
+          description: "Filter for unread emails only"
         },
         {
-          query: "Show me emails from my manager",
-          expectedParams: { query: "from:manager@company.com" },
-          description: "Filter emails by sender"
+          query: "Find emails from John with attachments",
+          expectedParams: { query: "from:john has:attachment" },
+          description: "Advanced search with multiple criteria"
         },
         {
-          query: "Any urgent emails?",
-          expectedParams: { query: "subject:urgent OR subject:important" },
-          description: "Filter for urgent emails"
+          query: "Get emails from last week",
+          expectedParams: { dateRange: { after: "2024/01/01" } },
+          description: "Date-based filtering"
+        },
+        {
+          query: "Show me 50 important emails",
+          expectedParams: { maxResults: 50, labelIds: ["IMPORTANT"] },
+          description: "Large result set with label filtering"
+        },
+        {
+          query: "Get email headers only for performance",
+          expectedParams: { format: "metadata", includeBody: false },
+          description: "Minimal data retrieval for performance"
         }
       ],
-      timeContext: 'current',
+      timeContext: 'any',
       dataAccess: 'read'
     });
   }
