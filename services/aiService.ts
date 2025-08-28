@@ -4,6 +4,7 @@ const MCP_BASE_URL = 'http://localhost:3001/api';
 
 interface AIQueryRequest {
   query: string;
+  sessionId?: string;
   preferences?: {
     responseStyle?: 'brief' | 'detailed' | 'conversational';
     includeActions?: boolean;
@@ -43,7 +44,7 @@ interface AvailableToolsResponse {
 
 export class AIService {
   /**
-   * Process a natural language query using AI
+   * Process a natural language query using AI with conversation context
    */
   static async processQuery(request: AIQueryRequest): Promise<AIQueryResponse> {
     try {

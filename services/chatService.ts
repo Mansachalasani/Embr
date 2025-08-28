@@ -48,7 +48,8 @@ export class ChatService {
    */
   static async processMessageWithStreaming(
     userMessage: string, 
-    callbacks: StreamingCallbacks
+    callbacks: StreamingCallbacks,
+    sessionId?: string
   ): Promise<void> {
     console.log('🌊 Starting streaming for:', userMessage);
     
@@ -88,7 +89,7 @@ export class ChatService {
     callbacks.onStart?.({ query: userMessage, fallback: true });
     
     try {
-      const responses = await this.processMessage(userMessage);
+      const responses = await this.processMessage(userMessage, sessionId);
       console.log('✅ Got responses:', responses.length);
       
       if (responses.length > 0) {
@@ -133,7 +134,7 @@ export class ChatService {
     };
   }
 
-  static async processMessage(userMessage: string): Promise<ChatMessage[]> {
+  static async processMessage(userMessage: string, sessionId?: string): Promise<ChatMessage[]> {
     // Check cache for repeated queries first (excluding commands)
     if (!userMessage.startsWith('/')) {
       const cachedResponse = this.getCachedResponse(userMessage);
@@ -266,6 +267,7 @@ export class ChatService {
             console.log('🧠 Sending query to AI service...');
             const aiResponse = await AIService.processQuery({
               query: userMessage,
+              sessionId,
               preferences: {
                 responseStyle: 'conversational',
                 includeActions: true

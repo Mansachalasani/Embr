@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AIToolMetadata, AIToolSelection, AIResponse, UserContext } from '../types/aiTools';
 import { MCPToolRegistry } from './mcpToolRegistry';
+import { SessionService } from './sessionService';
 
 export class AIService {
   private genAI: GoogleGenerativeAI;
@@ -28,7 +29,7 @@ export class AIService {
       console.log('🧠 AI Processing query:', context.query);
       
       // Step 1: Analyze query and select tool
-      const toolSelection = await this.selectTool(context);
+      const toolSelection = await this.selectTool(context, userId);
       
       console.log(toolSelection)
       if (!toolSelection) {
@@ -53,16 +54,24 @@ export class AIService {
       // Step 2: Execute the selected tool
       const toolResult = await this.executeTool(toolSelection, userId);
       
+      // Step 2.5: Check if we need tool chaining
+      let chainedResult = null;
+      if (toolResult.success && this.shouldChainTool(toolSelection, toolResult, context)) {
+        chainedResult = await this.performToolChaining(toolSelection, toolResult, userId, context);
+      }
+      
       // Step 3: Generate natural language response
-      const naturalResponse = await this.generateResponse(context, toolSelection, toolResult);
+      const finalResult = chainedResult || toolResult;
+      const naturalResponse = await this.generateResponse(context, toolSelection, finalResult, userId);
       
       return {
         success: true,
         toolUsed: toolSelection.tool,
-        rawData: toolResult.data,
+        rawData: finalResult.data,
         naturalResponse,
         reasoning: toolSelection.reasoning,
-        suggestedActions: await this.generateSuggestedActions(context, toolResult)
+        suggestedActions: await this.generateSuggestedActions(context, finalResult),
+        chainedTools: chainedResult ? ['searchWeb', 'crawlPage'] : undefined
       };
 
     } catch (error) {
@@ -76,9 +85,9 @@ export class AIService {
   }
 
   /**
-   * Analyze user query and select the best tool
+   * Analyze user query and select the best tool with conversation context
    */
-  public async selectTool(context: UserContext): Promise<AIToolSelection | null> {
+  public async selectTool(context: UserContext, userId?: string): Promise<AIToolSelection | null> {
     const availableTools = this.toolRegistry.getAllToolMetadata();
     
 //     const prompt = `
@@ -113,20 +122,36 @@ export class AIService {
 // - Be precise with parameters - only include what the user specified
 // `;
 
+    // Get conversation context if sessionId is provided
+    let conversationContext = '';
+    if (context.sessionId && userId) {
+      try {
+        const contextData = await SessionService.getConversationContext(context.sessionId, userId, 5);
+        if (contextData.messages.length > 0) {
+          conversationContext = '\n\nConversation History (last 5 messages):\n' + 
+            contextData.messages.map(msg => `${msg.role}: ${msg.content}`).join('\n');
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not fetch conversation context:', error);
+      }
+    }
+
 const prompt=`You are an intelligent assistant that decides whether to use a tool or directly answer with Gemini.
 
 Available Tools:
 ${this.formatToolsForPrompt(availableTools)}
 
 User Query: "${context.query}"
-Timestamp: ${context.timestamp}
+Timestamp: ${context.timestamp}${conversationContext}
 
 Your task:
 1. Decide if the query should be handled by a tool or directly answered by Gemini.
 2. If a tool is best, pick the correct one and extract the required parameters.
-3. If no tool matches but Gemini can generate a useful answer, provide that as "geminiOutput".
-4. Always classify the response into a category (e.g., "calendar", "email", "weather", "search", "general").
-5. Indicate if Gemini’s output can safely be shown to the user with a boolean flag.
+3. For real-time data (weather, news, stock prices, movie times, etc.) ALWAYS use searchWeb first.
+4. If the user mentions or asks about a specific website/URL, use crawlPage to get current content.
+5. If no tool matches but Gemini can generate a useful answer, provide that as "geminiOutput".
+6. Always classify the response into a category (e.g., "calendar", "email", "weather", "search", "general").
+7. Indicate if Gemini's output can safely be shown to the user with a boolean flag.
 
 Respond in **valid JSON**:
 {
@@ -140,11 +165,15 @@ Respond in **valid JSON**:
 }
 
 Guidelines:
+- Use conversation history to understand context and follow-up questions.
 - Use a tool when the user explicitly asks for actions related to the tool's functionality.
 - Calendar queries: use getTodaysEvents for "today", "this morning", "afternoon", "meetings"
 - Email queries: use getEmails for "emails", "messages", "inbox", "mail" - supports advanced search, date filtering, labels, attachments
 - For email queries, leverage Gmail search syntax (from:, subject:, is:unread, has:attachment, after:, before:, etc.)
-- If the query is informational (like "what is the weather in Hyderabad right now?" or "summarize this article"), prefer Gemini output.
+- **Real-time data queries**: Use searchWeb for weather, news, stock prices, movie showtimes, restaurant info, traffic, sports scores, etc.
+- **URL/Website queries**: Use crawlPage when user provides a URL or asks about specific website content
+- **Current events**: Use searchWeb for "latest", "recent", "today's", "breaking news", etc.
+- Consider previous messages when interpreting pronouns and references (e.g., "what about tomorrow?" after discussing today's calendar).
 - If unclear, return "tool": null and "geminiOutput": null.
 `
 
@@ -162,6 +191,7 @@ Guidelines:
       console.log('🤖 AI tool selection response:', text);
       
       const selection = JSON.parse(text);
+      console.log(selection)
       
       // // Validate selection
       // if (selection.tool && !availableTools.find(t => t.name === selection.tool)) {
@@ -228,11 +258,25 @@ Guidelines:
   }
 
   /**
-   * Generate natural language response from tool result
+   * Generate natural language response from tool result with conversation context
    */
-  public async generateResponse(context: UserContext, selection: AIToolSelection, toolResult: any): Promise<string> {
+  public async generateResponse(context: UserContext, selection: AIToolSelection, toolResult: any, userId?: string): Promise<string> {
     if (!toolResult.success) {
       return `I couldn't retrieve the information you requested. ${toolResult.error || 'Please try again later.'}`;
+    }
+
+    // Get conversation context if sessionId is provided
+    let conversationContext = '';
+    if (context.sessionId && userId) {
+      try {
+        const contextData = await SessionService.getConversationContext(context.sessionId, userId, 3);
+        if (contextData.messages.length > 0) {
+          conversationContext = '\n\nConversation History (last 3 messages):\n' + 
+            contextData.messages.map(msg => `${msg.role}: ${msg.content.substring(0, 100)}${msg.content.length > 100 ? '...' : ''}`).join('\n');
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not fetch conversation context for response generation:', error);
+      }
     }
 
     const prompt = `
@@ -240,16 +284,18 @@ You are a helpful personal assistant. Convert this raw data into a natural, conv
 
 Original Query: "${context.query}"
 Tool Used: ${selection.tool}
-Raw Data: ${JSON.stringify(toolResult.data, null, 2)}
+Raw Data: ${JSON.stringify(toolResult.data, null, 2)}${conversationContext}
 
 Instructions:
 - Write in a friendly, conversational tone
+- Use conversation history to maintain context and continuity
 - Focus on what the user asked for specifically
 - If it's calendar data, mention times and key details
 - If it's email data, summarize key messages
 - Keep it concise but informative
 - Use emojis sparingly and appropriately
 - If the data is empty or minimal, acknowledge that naturally
+- Reference previous messages when relevant (e.g., "As I mentioned earlier...")
 
 Examples:
 - For calendar: "You have 3 meetings today. Your next one is the team standup at 10 AM."
@@ -286,6 +332,77 @@ Generate a natural response:
     }
     
     return suggestions.slice(0, 2); // Limit to 2 suggestions
+  }
+
+  /**
+   * Determine if we should chain to another tool based on the first tool's result
+   */
+  private shouldChainTool(selection: AIToolSelection, toolResult: any, context: UserContext): boolean {
+    if (!toolResult.success || !toolResult.data) return false;
+    
+    // If we used searchWeb and got URLs that might be relevant, consider crawling them
+    if (selection.tool === 'searchWeb' && toolResult.data.results) {
+      const results = toolResult.data.results;
+      // Check if query suggests user wants detailed content analysis
+      const wantsSummary = context.query.toLowerCase().includes('summarize') ||
+                          context.query.toLowerCase().includes('analyze') ||
+                          context.query.toLowerCase().includes('what does') ||
+                          context.query.toLowerCase().includes('content of');
+      
+      // If we have results and user wants detailed analysis, chain to crawlPage
+      return wantsSummary && results.length > 0;
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Perform tool chaining - automatically use a second tool based on first tool's results
+   */
+  private async performToolChaining(
+    firstSelection: AIToolSelection, 
+    firstResult: any, 
+    userId: string, 
+    context: UserContext
+  ): Promise<any> {
+    try {
+      console.log('🔗 Performing tool chaining after:', firstSelection.tool);
+      
+      if (firstSelection.tool === 'searchWeb' && firstResult.data.results) {
+        // Get the most relevant URL from search results
+        const topResult = firstResult.data.results[0];
+        if (topResult && topResult.url) {
+          console.log('🔗 Chaining to crawlPage for URL:', topResult.url);
+          
+          // Use crawlPage to get detailed content
+          const crawlTool = this.toolRegistry.getTool('crawlPage');
+          if (crawlTool) {
+            const crawlResult = await crawlTool.execute(userId, {
+              url: topResult.url,
+              extract_content: true,
+              max_length: 3000
+            });
+            
+            if (crawlResult.success) {
+              // Combine search results with crawled content
+              return {
+                success: true,
+                data: {
+                  search_results: firstResult.data,
+                  crawled_content: crawlResult.data,
+                  chained_tools: ['searchWeb', 'crawlPage']
+                }
+              };
+            }
+          }
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('❌ Error in tool chaining:', error);
+      return null;
+    }
   }
 
   /**

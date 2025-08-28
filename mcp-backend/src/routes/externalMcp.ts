@@ -307,8 +307,8 @@ router.post('/test-connection', async (req, res) => {
       });
     }
 
-  } catch (error) {
-    console.error('Error testing connection:', error);
+    } catch (error) {
+      console.error('Error testing connection:', error);
     res.status(500).json({
       error: 'Failed to test connection',
       details: error instanceof Error ? error.message : 'Unknown error',

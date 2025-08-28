@@ -5,6 +5,7 @@ import { getEmailsToolDefinition } from './tools/getEmails';
 import { getLastTenMailsToolDefinition } from './tools/getLastTenMails';
 import { createCalendarEventToolDefinition } from './tools/createCalendarEvent';
 import { crawlPageToolDefinition } from './tools/crawlPage';
+import { searchWebToolDefinition } from './tools/searchWeb';
 
 export class MCPToolRegistry {
   private static instance: MCPToolRegistry;
@@ -285,6 +286,65 @@ export class MCPToolRegistry {
           query: "Get the main content from this article",
           expectedParams: { url: "https://example.com/article", extract_content: true },
           description: "Extract clean article content"
+        }
+      ],
+      timeContext: 'current',
+      dataAccess: 'read'
+    });
+
+    // Register searchWeb with AI metadata
+    this.registerToolWithMetadata('searchWeb', searchWebToolDefinition, {
+      name: 'searchWeb',
+      description: 'Search the web for current information, news, and answers using natural language queries',
+      category: 'search',
+      parameters: [
+        {
+          name: 'query',
+          type: 'string',
+          description: 'Natural language search query',
+          required: true,
+          examples: ['latest AI news', 'GPT-5 release date', 'weather in New York', 'Bitcoin price today']
+        },
+        {
+          name: 'max_results',
+          type: 'number',
+          description: 'Maximum number of results to return (default: 10, max: 20)',
+          required: false,
+          examples: ['5', '10', '20']
+        },
+        {
+          name: 'region',
+          type: 'string',
+          description: 'Search region/country code (default: us)',
+          required: false,
+          examples: ['us', 'uk', 'ca', 'au']
+        }
+      ],
+      examples: [
+        {
+          query: "What's the weather in Hyderabad today?",
+          expectedParams: { query: "weather Hyderabad today", max_results: 5 },
+          description: "Get current weather information"
+        },
+        {
+          query: "Latest news about AI developments",
+          expectedParams: { query: "latest AI news developments 2024", max_results: 10 },
+          description: "Search for recent AI news"
+        },
+        {
+          query: "What movies are playing near me?",
+          expectedParams: { query: "movie showtimes near me today", max_results: 10 },
+          description: "Find current movie showtimes"
+        },
+        {
+          query: "Bitcoin price right now",
+          expectedParams: { query: "Bitcoin price today current", max_results: 5 },
+          description: "Get current cryptocurrency prices"
+        },
+        {
+          query: "Best restaurants in San Francisco",
+          expectedParams: { query: "best restaurants San Francisco 2024", max_results: 10 },
+          description: "Find local restaurant recommendations"
         }
       ],
       timeContext: 'current',

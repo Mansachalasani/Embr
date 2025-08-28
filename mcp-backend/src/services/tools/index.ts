@@ -4,6 +4,7 @@ import { getLastTenMailsToolDefinition } from './getLastTenMails';
 import { getEmailsToolDefinition } from './getEmails';
 import { createCalendarEventToolDefinition } from './createCalendarEvent';
 import { crawlPageToolDefinition } from './crawlPage';
+import { searchWebToolDefinition } from './searchWeb';
 
 // Register all tools
 export function registerAllTools() {
@@ -12,6 +13,7 @@ export function registerAllTools() {
   MCPToolRegistry.registerTool(getEmailsToolDefinition);
   MCPToolRegistry.registerTool(createCalendarEventToolDefinition);
   MCPToolRegistry.registerTool(crawlPageToolDefinition);
+  MCPToolRegistry.registerTool(searchWebToolDefinition);
 }
 
 // Export tool definitions for potential individual use
@@ -21,4 +23,5 @@ export {
   getEmailsToolDefinition,
   createCalendarEventToolDefinition,
   crawlPageToolDefinition,
+  searchWebToolDefinition,
 };

@@ -547,7 +547,7 @@ export default function Chat() {
 
     try {
       // Start streaming
-      await ChatService.processMessageWithStreaming(currentInput, streamingCallbacks);
+      await ChatService.processMessageWithStreaming(currentInput, streamingCallbacks, currentSession.id);
     } catch (error) {
       console.error('❌ Streaming failed, falling back to regular processing:', error);
 
@@ -556,7 +556,7 @@ export default function Chat() {
       setThinkingMessage('Processing request...');
 
       try {
-        const responses = await ChatService.processMessage(currentInput);
+        const responses = await ChatService.processMessage(currentInput, currentSession.id);
         const finalMessages = [...updatedMessages, ...responses];
         setMessages(finalMessages);
 

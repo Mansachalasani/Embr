@@ -9,7 +9,7 @@ export interface AIToolParameter {
 export interface AIToolMetadata {
   name: string;
   description: string;
-  category: 'calendar' | 'email' | 'productivity' | 'system' | 'web' | 'external' | 'social' | 'custom';
+  category: 'calendar' | 'email' | 'productivity' | 'system' | 'web' | 'external' | 'social' | 'custom' | 'search';
   parameters: AIToolParameter[];
   examples: {
     query: string;
@@ -35,6 +35,7 @@ export interface AIResponse {
   naturalResponse: string;
   reasoning?: string;
   suggestedActions?: string[];
+  chainedTools?: string[];
   error?: string;
 }
 
@@ -42,6 +43,7 @@ export interface UserContext {
   query: string;
   timestamp: string;
   timezone?: string;
+  sessionId?: string;
   preferences?: {
     responseStyle: 'brief' | 'detailed' | 'conversational';
     includeActions: boolean;

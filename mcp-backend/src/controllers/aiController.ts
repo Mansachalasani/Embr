@@ -36,7 +36,7 @@ export class AIController {
         return;
       }
 
-      const { query, preferences } = req.body;
+      const { query, sessionId, preferences } = req.body;
 
       if (!query || typeof query !== 'string') {
         res.status(400).json({
@@ -53,6 +53,7 @@ export class AIController {
         query: query.trim(),
         timestamp: new Date().toISOString(),
         timezone: req.headers['x-timezone'] as string || 'UTC',
+        sessionId,
         preferences: {
           responseStyle: preferences?.responseStyle || 'conversational',
           includeActions: preferences?.includeActions !== false,
