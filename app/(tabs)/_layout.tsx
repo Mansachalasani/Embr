@@ -46,16 +46,16 @@ export default function TabLayout() {
         name="chat"
         options={{
           title: 'Chat',
-          headerTitle: '🔥 Chat with Embr',
+        headerShown:false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubbles" color={color} size={size} />
+            <Ionicons name="chatbubbles-outline" color={color} size={size} />
           ),
         }}
       />
       <Tabs.Screen
         name="index"
         options={{
-          href: null, // Hide this tab but keep it for redirect
+          href: null, // Hidden tab, still accessible for redirects
         }}
       />
       <Tabs.Screen
@@ -64,7 +64,7 @@ export default function TabLayout() {
           title: 'Profile',
           headerTitle: '👤 Profile',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-circle" color={color} size={size} />
+            <Ionicons name="person-circle-outline" color={color} size={size} />
           ),
         }}
       />
@@ -74,7 +74,7 @@ export default function TabLayout() {
           title: 'Settings',
           headerTitle: '⚙️ Settings',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings" color={color} size={size} />
+            <Ionicons name="settings-outline" color={color} size={size} />
           ),
         }}
       />

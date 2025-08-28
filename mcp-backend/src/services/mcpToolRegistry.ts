@@ -2,6 +2,9 @@ import { MCPTool, MCPToolResponse } from '../types';
 import { AIToolMetadata } from '../types/aiTools';
 import { getTodaysEventsToolDefinition } from './tools/getTodaysEvents';
 import { getEmailsToolDefinition } from './tools/getEmails';
+import { getLastTenMailsToolDefinition } from './tools/getLastTenMails';
+import { createCalendarEventToolDefinition } from './tools/createCalendarEvent';
+import { crawlPageToolDefinition } from './tools/crawlPage';
 
 export class MCPToolRegistry {
   private static instance: MCPToolRegistry;
@@ -149,6 +152,142 @@ export class MCPToolRegistry {
         }
       ],
       timeContext: 'any',
+      dataAccess: 'read'
+    });
+
+    // Register getLastTenMails with AI metadata
+    this.registerToolWithMetadata('getLastTenMails', getLastTenMailsToolDefinition, {
+      name: 'getLastTenMails',
+      description: 'Quickly retrieve the last 10 emails from Gmail inbox for recent activity summary',
+      category: 'email',
+      parameters: [],
+      examples: [
+        {
+          query: "Show me my recent emails",
+          expectedParams: {},
+          description: "Get the last 10 emails"
+        },
+        {
+          query: "What are my latest emails?",
+          expectedParams: {},
+          description: "Quick email summary"
+        }
+      ],
+      timeContext: 'recent',
+      dataAccess: 'read'
+    });
+
+    // Register createCalendarEvent with AI metadata
+    this.registerToolWithMetadata('createCalendarEvent', createCalendarEventToolDefinition, {
+      name: 'createCalendarEvent',
+      description: 'Create a new Google Calendar event with specified details including title, time, attendees, and location',
+      category: 'calendar',
+      parameters: [
+        {
+          name: 'title',
+          type: 'string',
+          description: 'Event title/subject',
+          required: true,
+          examples: ['Team Meeting', 'Doctor Appointment', 'Project Review']
+        },
+        {
+          name: 'start_time',
+          type: 'string',
+          description: 'Event start time in ISO format (e.g., 2024-01-15T15:00:00.000Z)',
+          required: true,
+          examples: ['2024-01-15T15:00:00.000Z', '2024-02-01T09:30:00.000Z']
+        },
+        {
+          name: 'end_time',
+          type: 'string',
+          description: 'Event end time in ISO format (e.g., 2024-01-15T16:00:00.000Z)',
+          required: true,
+          examples: ['2024-01-15T16:00:00.000Z', '2024-02-01T10:30:00.000Z']
+        },
+        {
+          name: 'attendees',
+          type: 'array',
+          description: 'Array of attendee email addresses',
+          required: false,
+          examples: ['["john@company.com", "sarah@company.com"]', '["team@company.com"]']
+        },
+        {
+          name: 'description',
+          type: 'string',
+          description: 'Event description/agenda',
+          required: false,
+          examples: ['Weekly team sync', 'Discuss project roadmap']
+        },
+        {
+          name: 'location',
+          type: 'string',
+          description: 'Event location (physical or virtual)',
+          required: false,
+          examples: ['Conference Room A', 'https://zoom.us/j/123456789', 'Central Park']
+        }
+      ],
+      examples: [
+        {
+          query: "Schedule a team meeting for tomorrow at 2 PM",
+          expectedParams: { title: "Team Meeting", start_time: "2024-01-16T14:00:00.000Z", end_time: "2024-01-16T15:00:00.000Z" },
+          description: "Create meeting with calculated date/time"
+        },
+        {
+          query: "Create a doctor appointment for next Monday at 10 AM to 11 AM",
+          expectedParams: { title: "Doctor Appointment", start_time: "2024-01-22T10:00:00.000Z", end_time: "2024-01-22T11:00:00.000Z" },
+          description: "Healthcare appointment scheduling"
+        }
+      ],
+      timeContext: 'future',
+      dataAccess: 'write'
+    });
+
+    // Register crawlPage with AI metadata
+    this.registerToolWithMetadata('crawlPage', crawlPageToolDefinition, {
+      name: 'crawlPage',
+      description: 'Crawl and extract content from web pages for analysis and information retrieval',
+      category: 'web',
+      parameters: [
+        {
+          name: 'url',
+          type: 'string',
+          description: 'URL of the web page to crawl (must be HTTP or HTTPS)',
+          required: true,
+          examples: ['https://example.com', 'https://news.ycombinator.com', 'https://github.com/user/repo']
+        },
+        {
+          name: 'extract_content',
+          type: 'boolean',
+          description: 'Whether to extract main content (true) or return full HTML (false). Default: true',
+          required: false,
+          examples: ['true', 'false']
+        },
+        {
+          name: 'max_length',
+          type: 'number',
+          description: 'Maximum number of characters to return. Default: 5000',
+          required: false,
+          examples: ['1000', '5000', '10000']
+        }
+      ],
+      examples: [
+        {
+          query: "What's the latest news on Hacker News?",
+          expectedParams: { url: "https://news.ycombinator.com" },
+          description: "Crawl news website for current information"
+        },
+        {
+          query: "Analyze the content of this GitHub repository",
+          expectedParams: { url: "https://github.com/user/repo" },
+          description: "Extract information from GitHub pages"
+        },
+        {
+          query: "Get the main content from this article",
+          expectedParams: { url: "https://example.com/article", extract_content: true },
+          description: "Extract clean article content"
+        }
+      ],
+      timeContext: 'current',
       dataAccess: 'read'
     });
   }

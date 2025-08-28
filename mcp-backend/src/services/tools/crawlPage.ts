@@ -1,5 +1,5 @@
 import { MCPTool, MCPToolResponse } from '../../types';
-import * as cheerio from 'cheerio';
+import { load } from 'cheerio';
 
 interface CrawlPageParams {
   url: string;
@@ -94,7 +94,7 @@ export const crawlPageToolDefinition: MCPTool = {
 
       if (extractContent) {
         // Use Cheerio to parse and extract content
-        const $ = cheerio.load(html);
+        const $ = load(html);
         
         // Remove script and style elements
         $('script, style, nav, footer, aside, .advertisement, .ads').remove();
@@ -147,7 +147,7 @@ export const crawlPageToolDefinition: MCPTool = {
         
         // Extract headings
         const headings: string[] = [];
-        $('h1, h2, h3').each((_, element) => {
+        $('h1, h2, h3').each((_: number, element: any) => {
           const heading = $(element).text().trim();
           if (heading && headings.length < 10) {
             headings.push(heading);
@@ -157,7 +157,7 @@ export const crawlPageToolDefinition: MCPTool = {
         
         // Extract links
         const links: Array<{text: string, url: string}> = [];
-        $('a[href]').each((_, element) => {
+        $('a[href]').each((_: number, element: any) => {
           const linkText = $(element).text().trim();
           const linkUrl = $(element).attr('href');
           if (linkText && linkUrl && links.length < 20) {

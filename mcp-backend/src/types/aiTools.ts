@@ -9,14 +9,14 @@ export interface AIToolParameter {
 export interface AIToolMetadata {
   name: string;
   description: string;
-  category: 'calendar' | 'email' | 'productivity' | 'system';
+  category: 'calendar' | 'email' | 'productivity' | 'system' | 'web' | 'external' | 'social' | 'custom';
   parameters: AIToolParameter[];
   examples: {
     query: string;
     expectedParams: Record<string, any>;
     description: string;
   }[];
-  timeContext?: 'current' | 'future' | 'past' | 'any';
+  timeContext?: 'current' | 'future' | 'past' | 'any' | 'recent';
   dataAccess: 'read' | 'write' | 'both';
 }
 

@@ -31,11 +31,13 @@ const { width: screenWidth } = Dimensions.get('window');
 
 export default function Chat() {
   const { colors } = useTheme();
-  
+
   const styles = StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: colors.background,
+      minHeight:"93%"
+     
     },
     loadingContainer: {
       flex: 1,
@@ -54,14 +56,26 @@ export default function Chat() {
       justifyContent: 'space-between',
       paddingHorizontal: 16,
       paddingVertical: 12,
-      backgroundColor: colors.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
+      backgroundColor: colors.background,
+      // borderBottomWidth: 1,
+      // borderBottomColor: colors.border,
       shadowColor: colors.shadow,
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
       shadowRadius: 8,
       elevation: 3,
+    
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 20,
+    },
+    emptyText: {
+      fontSize: 18,
+      color: "#888",
+      textAlign: "center",
     },
     sessionInfo: {
       flexDirection: 'row',
@@ -188,10 +202,11 @@ export default function Chat() {
       borderTopWidth: 1,
       borderTopColor: colors.border,
       shadowColor: colors.shadow,
-      shadowOffset: { width: 0, height: -2 },
+      shadowOffset: { width: 0, height:-2 },
       shadowOpacity: 0.05,
       shadowRadius: 8,
       elevation: 5,
+    
     },
     textInput: {
       flex: 1,
@@ -246,34 +261,24 @@ export default function Chat() {
   // Initialize session on component mount
   useEffect(() => {
     initializeSession();
+
   }, []);
+
+
 
   const initializeSession = async () => {
     try {
-      // Check for existing session
-      const savedSessionId = await AsyncStorage.getItem(CURRENT_SESSION_KEY);
-      
-      if (savedSessionId) {
-        try {
-          const session = await SessionService.getSession(savedSessionId);
-          setCurrentSession(session);
-          await loadSessionMessages(savedSessionId);
-        } catch (error) {
-          console.log('Previous session not found, creating new one');
-          await createNewSession();
-        }
-      } else {
-        await createNewSession();
-      }
+      await createNewSession();
+
     } catch (error) {
       console.error('❌ Error initializing session:', error);
-      // Fallback to local mode without sessions
-      setMessages([{
-        id: '1',
-        type: 'assistant',
-        content: '👋 **Welcome to MCP Chat!**\n\nI can help you access your Google Workspace data.\n\n**First time here?**\n1. Use `/connect` to link your Google account\n2. Then try `/calendar` or `/emails`\n3. Type `/help` to see all commands\n\n**Quick start:** Type `/connect` to begin!',
-        timestamp: new Date().toISOString(),
-      }]);
+      // // Fallback to local mode without sessions
+      // setMessages([{
+      //   id: '1',
+      //   type: 'assistant',
+      //   content: '👋 **Welcome to MCP Chat!**\n\nI can help you access your Google Workspace data.\n\n**First time here?**\n1. Use `/connect` to link your Google account\n2. Then try `/calendar` or `/emails`\n3. Type `/help` to see all commands\n\n**Quick start:** Type `/connect` to begin!',
+      //   timestamp: new Date().toISOString(),
+      // }]);
     } finally {
       setIsSessionLoading(false);
     }
@@ -285,24 +290,24 @@ export default function Chat() {
         title: `Chat - ${new Date().toLocaleDateString()}`,
         description: 'MCP Assistant conversation'
       });
-      
+      console.log(session, 'meow')
       setCurrentSession(session);
       await AsyncStorage.setItem(CURRENT_SESSION_KEY, session.id);
-      
+
       // Add welcome message to session
-      const welcomeContent = '👋 **Welcome to MCP Chat!**\n\nI can help you access your Google Workspace data.\n\n**First time here?**\n1. Use `/connect` to link your Google account\n2. Then try `/calendar` or `/emails`\n3. Type `/help` to see all commands\n\n**Quick start:** Type `/connect` to begin!';
-      
-      await SessionService.addMessage(session.id, 'assistant', welcomeContent, {
-        isWelcome: true
-      });
-      
-      setMessages([{
-        id: '1',
-        type: 'assistant',
-        content: welcomeContent,
-        timestamp: new Date().toISOString(),
-      }]);
-      
+      // const welcomeContent = '👋 **Welcome to MCP Chat!**\n\nI can help you access your Google Workspace data.\n\n**First time here?**\n1. Use `/connect` to link your Google account\n2. Then try `/calendar` or `/emails`\n3. Type `/help` to see all commands\n\n**Quick start:** Type `/connect` to begin!';
+
+      // await SessionService.addMessage(session.id, 'assistant', welcomeContent, {
+      //   isWelcome: true
+      // });
+
+      // setMessages([{
+      //   id: '1',
+      //   type: 'assistant',
+      //   content: welcomeContent,
+      //   timestamp: new Date().toISOString(),
+      // }]);
+
     } catch (error) {
       console.error('❌ Error creating session:', error);
       throw error;
@@ -319,7 +324,7 @@ export default function Chat() {
       }
 
       const sessionMessages = await SessionService.getSessionMessages(sessionId);
-      
+
       const chatMessages: ChatMessage[] = sessionMessages.map((msg: Message) => ({
         id: msg.id,
         type: msg.role as ChatMessage['type'],
@@ -327,7 +332,7 @@ export default function Chat() {
         timestamp: msg.created_at,
         metadata: msg.metadata
       }));
-      
+
       // Cache the messages
       messageCache.current.set(sessionId, chatMessages);
       setMessages(chatMessages);
@@ -343,14 +348,14 @@ export default function Chat() {
     const userMessage = ChatService.createMessage('user', inputText.trim());
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
-    
+
     const currentInput = inputText.trim();
     setInputText('');
     setIsLoading(true);
-    
+
     // Save user message to session (async, don't wait)
     SessionService.addMessage(currentSession.id, 'user', currentInput).catch(console.error);
-    
+
     // Initialize streaming message
     const streamingId = ChatService.generateId();
     setStreamingMessage({
@@ -373,7 +378,7 @@ export default function Chat() {
           setThinkingMessage('Analyzing your request...');
         }
       },
-      
+
       onToolSelection: (data) => {
         console.log('🎯 Tool selection:', data);
         if (data.status === 'analyzing') {
@@ -391,7 +396,7 @@ export default function Chat() {
           setThinkingMessage(`Selected: ${data.tool}`);
         }
       },
-      
+
       onToolExecution: (data) => {
         console.log('🔧 Tool execution:', data);
         if (data.status === 'executing') {
@@ -405,15 +410,15 @@ export default function Chat() {
           setThinkingMessage('Generating response...');
         }
       },
-      
+
       onResponseChunk: (data) => {
         console.log('📝 Response chunk received:', { status: data.status, chunkLength: data.chunk?.length, isComplete: data.isComplete });
-        
+
         if (data.status === 'generating') {
           setThinkingMessage('Generating response...');
           return;
         }
-        
+
         // Update streaming message with new chunk
         setStreamingMessage(prev => {
           const newState = prev ? {
@@ -425,21 +430,21 @@ export default function Chat() {
           console.log('📝 Updated streaming message:', newState);
           return newState;
         });
-        
+
         // Auto-scroll as content is being typed
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
         }, 50);
       },
-      
+
       onComplete: (data) => {
         console.log('✅ Stream completed:', data);
         console.log('🔍 StreamingMessage state:', streamingMessage);
         console.log('🔍 UpdatedMessages length:', updatedMessages.length);
-        
+
         // Use responses from data if available, fallback to streamingMessage content
         let finalMessages = [...updatedMessages];
-        
+
         if (data.responses && data.responses.length > 0) {
           // Use the actual responses from the completion data
           console.log('✅ Using responses from data:', data.responses.length, 'responses');
@@ -458,14 +463,14 @@ export default function Chat() {
           );
           finalMessages = [...updatedMessages, finalMessage];
         }
-        
+
         // Update messages in UI
         console.log('🎯 Setting final messages:', finalMessages.length, 'total messages');
         setMessages(finalMessages);
-        
+
         // Update cache
         messageCache.current.set(currentSession.id, finalMessages);
-        
+
         // Save messages to session (async)
         const responsesToSave = data.responses || (streamingMessage?.content ? [
           ChatService.createMessage('assistant', streamingMessage.content, {
@@ -474,7 +479,7 @@ export default function Chat() {
             reasoning: data.reasoning
           })
         ] : []);
-        
+
         for (const response of responsesToSave) {
           SessionService.addMessage(
             currentSession.id,
@@ -483,7 +488,7 @@ export default function Chat() {
             response.metadata
           ).catch(console.error);
         }
-        
+
         // Add suggested actions if available
         if (data.suggestedActions && data.suggestedActions.length > 0) {
           const suggestionsMessage = ChatService.createMessage(
@@ -491,11 +496,11 @@ export default function Chat() {
             `💡 **Suggestions:**\n${data.suggestedActions.map((action: string) => `• ${action}`).join('\n')}`,
             { toolName: 'suggestions' }
           );
-          
+
           const messagesWithSuggestions = [...finalMessages, suggestionsMessage];
           setMessages(messagesWithSuggestions);
           messageCache.current.set(currentSession.id, messagesWithSuggestions);
-          
+
           SessionService.addMessage(
             currentSession.id,
             'system',
@@ -503,28 +508,28 @@ export default function Chat() {
             suggestionsMessage.metadata
           ).catch(console.error);
         }
-        
+
         // Clear streaming state
         setStreamingMessage(null);
         setIsLoading(false);
         setThinkingMessage('');
       },
-      
+
       onError: (error) => {
         console.error('❌ Streaming error:', error);
-        
+
         const errorMessage = ChatService.createMessage(
           'assistant',
           `❌ **Error:** ${error}`,
           { error: true }
         );
-        
+
         const finalMessages = [...updatedMessages, errorMessage];
         setMessages(finalMessages);
-        
+
         // Update cache
         messageCache.current.set(currentSession.id, finalMessages);
-        
+
         // Save error message
         SessionService.addMessage(
           currentSession.id,
@@ -532,7 +537,7 @@ export default function Chat() {
           errorMessage.content,
           errorMessage.metadata
         ).catch(console.error);
-        
+
         // Clear streaming state
         setStreamingMessage(null);
         setIsLoading(false);
@@ -545,19 +550,19 @@ export default function Chat() {
       await ChatService.processMessageWithStreaming(currentInput, streamingCallbacks);
     } catch (error) {
       console.error('❌ Streaming failed, falling back to regular processing:', error);
-      
+
       // Fallback to regular processing
       setStreamingMessage(null);
       setThinkingMessage('Processing request...');
-      
+
       try {
         const responses = await ChatService.processMessage(currentInput);
         const finalMessages = [...updatedMessages, ...responses];
         setMessages(finalMessages);
-        
+
         // Update cache
         messageCache.current.set(currentSession.id, finalMessages);
-        
+
         // Save responses to session
         for (const response of responses) {
           SessionService.addMessage(
@@ -567,18 +572,18 @@ export default function Chat() {
             response.metadata
           ).catch(console.error);
         }
-        
+
       } catch (fallbackError) {
         const errorMessage = ChatService.createMessage(
           'assistant',
           `❌ **Error:** ${fallbackError instanceof Error ? fallbackError.message : 'Something went wrong'}`,
           { error: true }
         );
-        
+
         const finalMessages = [...updatedMessages, errorMessage];
         setMessages(finalMessages);
         messageCache.current.set(currentSession.id, finalMessages);
-        
+
         SessionService.addMessage(
           currentSession.id,
           'assistant',
@@ -586,7 +591,7 @@ export default function Chat() {
           errorMessage.metadata
         ).catch(console.error);
       }
-      
+
       setIsLoading(false);
       setThinkingMessage('');
     }
@@ -622,7 +627,7 @@ export default function Chat() {
   const getMessageIcon = (type: ChatMessage['type'], metadata?: any) => {
     if (metadata?.loading) return 'hourglass-outline';
     if (metadata?.error) return 'alert-circle-outline';
-    
+
     switch (type) {
       case 'user': return 'person-outline';
       case 'assistant': return 'chatbubble-ellipses-outline';
@@ -635,7 +640,7 @@ export default function Chat() {
   const getMessageColor = (type: ChatMessage['type'], metadata?: any) => {
     if (metadata?.error) return '#dc3545';
     if (metadata?.loading) return '#ffc107';
-    
+
     switch (type) {
       case 'user': return '#fff';
       case 'assistant': return '#4285F4';
@@ -649,7 +654,7 @@ export default function Chat() {
     const isUser = item.type === 'user';
     const isSystem = item.type === 'system';
     const isTool = item.type === 'tool';
-    
+
     return (
       <View style={[
         styles.messageContainer,
@@ -657,17 +662,17 @@ export default function Chat() {
       ]}>
         <View style={[
           styles.messageBubble,
-          isUser ? styles.userBubble : 
-          isSystem ? styles.systemBubble : 
-          isTool ? styles.toolBubble : 
-          styles.assistantBubble
+          isUser ? styles.userBubble :
+            isSystem ? styles.systemBubble :
+              isTool ? styles.toolBubble :
+                styles.assistantBubble
         ]}>
           {!isUser && (
             <View style={styles.messageHeader}>
-              <Ionicons 
-                name={getMessageIcon(item.type, item.metadata)} 
-                size={16} 
-                color={getMessageColor(item.type, item.metadata)} 
+              <Ionicons
+                name={getMessageIcon(item.type, item.metadata)}
+                size={16}
+                color={getMessageColor(item.type, item.metadata)}
               />
               <Text style={[
                 styles.messageRole,
@@ -680,7 +685,7 @@ export default function Chat() {
               )}
             </View>
           )}
-          
+
           <Text style={[
             styles.messageText,
             isUser ? styles.userText : styles.assistantText,
@@ -688,7 +693,7 @@ export default function Chat() {
           ]}>
             {item.content}
           </Text>
-          
+
           {item.metadata?.toolName && (
             <View style={styles.toolBadge}>
               <MaterialIcons name="build" size={12} color={colors.success} />
@@ -696,11 +701,11 @@ export default function Chat() {
             </View>
           )}
         </View>
-        
+
         <Text style={styles.timestamp}>
-          {new Date(item.timestamp).toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit' 
+          {new Date(item.timestamp).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit'
           })}
         </Text>
       </View>
@@ -721,136 +726,132 @@ export default function Chat() {
   }
 
   return (
-    <LinearGradient colors={colors.gradientBackground} style={styles.container}>
-      <SafeAreaView style={styles.container}>
-      {/* Header with session info and controls */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.sessionsToggle} 
-          onPress={() => setShowSessions(!showSessions)}
-        >
-          <MaterialIcons 
-            name={showSessions ? "close" : "menu"} 
-            size={24} 
-            color={colors.primary} 
-          />
-        </TouchableOpacity>
-        <View style={styles.sessionInfo}>
-          <MaterialIcons name="chat" size={20} color={colors.primary} />
-          <Text style={styles.sessionTitle} numberOfLines={1}>
-            {currentSession?.title || 'Chat Session'}
-          </Text>
-        </View>
-        <TouchableOpacity style={styles.newChatButton} onPress={handleNewSession}>
-          <Ionicons name="add" size={20} color={colors.primary} />
-        </TouchableOpacity>
-      </View>
-      
-      {/* Sessions Sidebar */}
-      {showSessions && (
-        <View style={styles.sessionsOverlay}>
-          <TouchableOpacity 
-            style={styles.overlay} 
-            onPress={() => setShowSessions(false)}
-          />
-          <View style={styles.sessionsSidebar}>
-            <SessionList
-              onSelectSession={handleSelectSession}
-              currentSessionId={currentSession?.id}
-              onNewSession={handleNewSession}
+
+    <SafeAreaView style={styles.container}>
+      <LinearGradient colors={colors.gradientBackground} style={styles.container}>
+        {/* Header with session info and controls */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.sessionsToggle}
+            onPress={() => setShowSessions(!showSessions)}
+          >
+            <MaterialIcons
+              name={showSessions ? "close" : "menu"}
+              size={24}
+              color={colors.primary}
             />
-          </View>
+          </TouchableOpacity>
+          {/* <View style={styles.sessionInfo}>
+            <MaterialIcons name="chat" size={20} color={colors.primary} />
+            <Text style={styles.sessionTitle} numberOfLines={1}>
+              {currentSession?.title || 'Chat Session'}
+            </Text>
+          </View> */}
+          <TouchableOpacity style={styles.newChatButton} onPress={handleNewSession}>
+            <Ionicons name="add" size={20} color={colors.primary} />
+          </TouchableOpacity>
         </View>
-      )}
-      
-      <KeyboardAvoidingView 
-        style={styles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          renderItem={renderMessage}
-          keyExtractor={(item) => item.id}
-          style={styles.messagesList}
-          contentContainerStyle={styles.messagesContent}
-          showsVerticalScrollIndicator={false}
-          removeClippedSubviews={true}
-          maxToRenderPerBatch={10}
-          updateCellsBatchingPeriod={50}
-          initialNumToRender={20}
-          windowSize={10}
-        />
-        
-        {/* Streaming Message */}
-        {streamingMessage && (
-          <StreamingMessage
-            content={streamingMessage.content}
-            isStreaming={streamingMessage.isStreaming}
-            toolName={streamingMessage.toolName}
-            toolStatus={streamingMessage.toolStatus}
-            onStreamComplete={() => {
-              // Auto-scroll when streaming completes
-              setTimeout(() => {
-                flatListRef.current?.scrollToEnd({ animated: true });
-              }, 100);
-            }}
-          />
-        )}
-        
-        {/* Thinking Animation */}
-        <ThinkingAnimation visible={isLoading && !!thinkingMessage} message={thinkingMessage} />
-        
-        {messages.length <= 1 && (
-          <View style={styles.suggestionsContainer}>
-            <Text style={styles.suggestionsTitle}>💡 Quick Commands:</Text>
-            <View style={styles.suggestionsRow}>
-              {suggestedCommands.map((cmd) => (
-                <TouchableOpacity
-                  key={cmd}
-                  style={styles.suggestionChip}
-                  onPress={() => setInputText(cmd)}
-                >
-                  <Text style={styles.suggestionText}>{cmd}</Text>
-                </TouchableOpacity>
-              ))}
+
+        {/* Sessions Sidebar */}
+        {showSessions && (
+          <View style={styles.sessionsOverlay}>
+            <TouchableOpacity
+              style={styles.overlay}
+              onPress={() => setShowSessions(false)}
+            />
+            <View style={styles.sessionsSidebar}>
+              <SessionList
+
+                onSelectSession={handleSelectSession}
+                currentSessionId={currentSession?.id}
+                onNewSession={handleNewSession}
+              />
             </View>
           </View>
         )}
 
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.textInput}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="Type a message or /command..."
-            placeholderTextColor="#8e8e93"
-            multiline
-            maxLength={500}
-            editable={!isLoading}
-          />
-          
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              (!inputText.trim() || isLoading) && styles.sendButtonDisabled
-            ]}
-            onPress={handleSend}
-            disabled={!inputText.trim() || isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <MaterialIcons 
-                name="send" 
-                size={20} 
-                color={(!inputText.trim() || isLoading) ? colors.textSecondary : colors.primary} 
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoid}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          {
+            messages.length > 0 ? (
+              <FlatList
+                ref={flatListRef}
+                data={messages}
+                renderItem={renderMessage}
+                keyExtractor={(item) => item.id}
+                style={styles.messagesList}
+                contentContainerStyle={styles.messagesContent}
+                showsVerticalScrollIndicator={false}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={10}
+                updateCellsBatchingPeriod={50}
+                initialNumToRender={20}
+                windowSize={10}
               />
-            )}
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-      </SafeAreaView>
-    </LinearGradient>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>👋 How can I help you today?</Text>
+              </View>
+            )
+          }
+
+          {/* Streaming Message */}
+          {streamingMessage && (
+            <StreamingMessage
+              content={streamingMessage.content}
+              isStreaming={streamingMessage.isStreaming}
+              toolName={streamingMessage.toolName}
+              toolStatus={streamingMessage.toolStatus}
+              onStreamComplete={() => {
+                // Auto-scroll when streaming completes
+                setTimeout(() => {
+                  flatListRef.current?.scrollToEnd({ animated: true });
+                }, 100);
+              }}
+            />
+          )}
+
+          {/* Thinking Animation */}
+          <ThinkingAnimation visible={isLoading && !!thinkingMessage} message={thinkingMessage} />
+
+
+
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.textInput}
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder="Type a message or /command..."
+              placeholderTextColor="#8e8e93"
+              multiline
+              maxLength={500}
+              editable={!isLoading}
+            />
+
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                (!inputText.trim() || isLoading) && styles.sendButtonDisabled
+              ]}
+              onPress={handleSend}
+              disabled={!inputText.trim() || isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color={colors.secondary} />
+              ) : (
+                <MaterialIcons
+                  name="send"
+                  size={20}
+                  color={(!inputText.trim() || isLoading) ? colors.primary : "white"}
+                />
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+
+      </LinearGradient>
+    </SafeAreaView>
   );
 }

@@ -4,6 +4,7 @@ import mcpRoutes from './mcp';
 import aiRoutes from './ai';
 import sessionRoutes from './sessions';
 import streamingRoutes from './streaming';
+import externalMcpRoutes from './externalMcp';
 
 const router = express.Router();
 
@@ -31,6 +32,7 @@ router.get('/', (req, res) => {
       endpoints: {
         auth: '/api/auth/*',
         mcp: '/api/mcp/*',
+        'external-mcp': '/api/external-mcp/*',
         ai: '/api/ai/*',
         sessions: '/api/sessions/*',
         streaming: '/api/streaming/*',
@@ -44,6 +46,7 @@ router.get('/', (req, res) => {
 // Mount route modules
 router.use('/auth', authRoutes);
 router.use('/mcp', mcpRoutes);
+router.use('/external-mcp', externalMcpRoutes);
 router.use('/ai', aiRoutes);
 router.use('/sessions', sessionRoutes);
 router.use('/streaming', streamingRoutes);

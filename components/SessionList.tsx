@@ -34,6 +34,164 @@ export const SessionList: React.FC<SessionListProps> = ({
   const [showNewSessionModal, setShowNewSessionModal] = useState(false);
   const [newSessionTitle, setNewSessionTitle] = useState('');
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 16,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    newSessionButton: {
+      padding: 4,
+    },
+    sessionsList: {
+      flex: 1,
+    },
+    sessionItem: {
+      backgroundColor: colors.surface,
+      padding: 16,
+      marginHorizontal: 12,
+      marginVertical: 6,
+      borderRadius: 12,
+      shadowColor: colors.shadow, // add this in your theme if needed
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    activeSession: {
+      borderWidth: 2,
+      borderColor: colors.primary,
+    },
+    sessionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    sessionTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+      flex: 1,
+    },
+    deleteButton: {
+      padding: 4,
+      marginLeft: 8,
+    },
+    sessionPreview: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginBottom: 8,
+      lineHeight: 20,
+    },
+    sessionFooter: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    sessionDate: {
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    sessionStats: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    messageCount: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginLeft: 4,
+    },
+    emptyContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 60,
+    },
+    emptyText: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      marginTop: 16,
+    },
+    emptySubtext: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginTop: 4,
+    },
+    // Modal styles
+    modalContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalContent: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 24,
+      width: '85%',
+      maxWidth: 400,
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      textAlign: 'center',
+      marginBottom: 20,
+      color: colors.text,
+    },
+    titleInput: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 16,
+      marginBottom: 20,
+      color: colors.text,
+
+    },
+    modalButtons: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    modalButton: {
+      flex: 1,
+      padding: 12,
+      borderRadius: 8,
+      marginHorizontal: 6,
+    },
+    cancelButton: {
+      backgroundColor: colors.surfaceVariant, // e.g. lighter/darker depending on theme
+    },
+    createButton: {
+      backgroundColor: colors.primary,
+    },
+    cancelButtonText: {
+      textAlign: 'center',
+      fontSize: 16,
+      color: colors.textSecondary,
+    },
+    createButtonText: {
+      textAlign: 'center',
+      fontSize: 16,
+      color: colors.onPrimary, // white on dark blue, black on light yellow, etc.
+      fontWeight: '600',
+    },
+  });
+
+
   useEffect(() => {
     loadSessions();
   }, []);
@@ -43,8 +201,9 @@ export const SessionList: React.FC<SessionListProps> = ({
       setLoading(true);
       console.log('🔄 Loading sessions...');
       const userSessions = await SessionService.getUserSessions();
-      console.log('✅ Loaded sessions:', userSessions.length, 'sessions');
-      setSessions(userSessions);
+      console.log(userSessions,'wdef')
+      console.log('✅ Loaded sessions:', userSessions.count, 'sessions');
+      setSessions(userSessions.sessions);
     } catch (error) {
       console.error('❌ Error loading sessions:', error);
       Alert.alert('Error', 'Failed to load sessions');
@@ -245,158 +404,3 @@ export const SessionList: React.FC<SessionListProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  newSessionButton: {
-    padding: 4,
-  },
-  sessionsList: {
-    flex: 1,
-  },
-  sessionItem: {
-    backgroundColor: 'white',
-    padding: 16,
-    marginHorizontal: 12,
-    marginVertical: 6,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  activeSession: {
-    borderWidth: 2,
-    borderColor: '#007AFF',
-  },
-  sessionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  sessionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    flex: 1,
-  },
-  deleteButton: {
-    padding: 4,
-    marginLeft: 8,
-  },
-  sessionPreview: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-    lineHeight: 20,
-  },
-  sessionFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  sessionDate: {
-    fontSize: 12,
-    color: '#999',
-  },
-  sessionStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  messageCount: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 4,
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#999',
-    marginTop: 16,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 4,
-  },
-  // Modal styles
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 24,
-    width: '85%',
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
-    color: '#333',
-  },
-  titleInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 20,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  modalButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    marginHorizontal: 6,
-  },
-  cancelButton: {
-    backgroundColor: '#f0f0f0',
-  },
-  createButton: {
-    backgroundColor: '#007AFF',
-  },
-  cancelButtonText: {
-    textAlign: 'center',
-    fontSize: 16,
-    color: '#666',
-  },
-  createButtonText: {
-    textAlign: 'center',
-    fontSize: 16,
-    color: 'white',
-    fontWeight: '600',
-  },
-});
