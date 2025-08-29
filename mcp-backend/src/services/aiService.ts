@@ -293,9 +293,10 @@ Instructions:
 - If it's calendar data, mention times and key details
 - If it's email data, summarize key messages
 - Keep it concise but informative
-- Use emojis sparingly and appropriately
+- ${context.preferences?.isVoiceMode ? 'NO emojis, markdown, or special formatting - plain text only for speech synthesis' : 'Use emojis sparingly and appropriately'}
 - If the data is empty or minimal, acknowledge that naturally
 - Reference previous messages when relevant (e.g., "As I mentioned earlier...")
+- ${context.preferences?.isVoiceMode ? 'Speak naturally as if talking to someone in person' : 'Format appropriately for text display'}
 
 Examples:
 - For calendar: "You have 3 meetings today. Your next one is the team standup at 10 AM."

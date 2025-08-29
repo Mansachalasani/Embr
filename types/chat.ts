@@ -9,6 +9,7 @@ export interface ChatMessage {
     error?: boolean;
     loading?: boolean;
     reasoning?: string;
+    isVoice?: boolean;
   };
 }
 

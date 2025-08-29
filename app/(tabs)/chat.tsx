@@ -23,6 +23,7 @@ import { SessionList } from '../../components/SessionList';
 import { ThinkingAnimation } from '../../components/ThinkingAnimation';
 import { StreamingMessage } from '../../components/StreamingMessage';
 import { StreamingCallbacks } from '../../services/streamingService';
+import { VoiceChat } from '../../components/VoiceChat';
 import { useTheme } from '../../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -240,6 +241,53 @@ export default function Chat() {
       shadowOpacity: 0,
       elevation: 0,
     },
+    voiceBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.primary + '20',
+      borderRadius: 12,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      marginTop: 4,
+      alignSelf: 'flex-start',
+    },
+    voiceText: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: colors.primary,
+      marginLeft: 2,
+    },
+    toolBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.success + '20',
+      borderRadius: 12,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      marginTop: 4,
+      alignSelf: 'flex-start',
+    },
+    toolText: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: colors.success,
+      marginLeft: 2,
+    },
+    userText: {
+      color: '#fff',
+    },
+    assistantText: {
+      color: colors.text,
+    },
+    errorText: {
+      color: colors.error,
+    },
+    timestamp: {
+      fontSize: 11,
+      color: colors.textSecondary,
+      marginTop: 4,
+      alignSelf: 'flex-end',
+    },
   });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -255,6 +303,7 @@ export default function Chat() {
     toolName?: string;
     toolStatus?: string;
   } | null>(null);
+  const [isVoiceModeEnabled, setIsVoiceModeEnabled] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const messageCache = useRef<Map<string, ChatMessage[]>>(new Map());
 
@@ -597,6 +646,41 @@ export default function Chat() {
     }
   };
 
+  const handleVoiceMessage = async (userText: string, aiText: string, audioData: ArrayBuffer) => {
+    if (!currentSession) return;
+
+    try {
+      // Add user message to UI
+      const userMessage = ChatService.createMessage('user', userText, { isVoice: true });
+      const aiMessage = ChatService.createMessage('assistant', aiText, { isVoice: true });
+      
+      const updatedMessages = [...messages, userMessage, aiMessage];
+      setMessages(updatedMessages);
+      
+      // Update cache
+      messageCache.current.set(currentSession.id, updatedMessages);
+      
+      // Auto-scroll to latest message
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+
+      console.log('🎤 Voice message added:', { userText: userText.substring(0, 50), aiText: aiText.substring(0, 50) });
+      
+    } catch (error) {
+      console.error('❌ Error handling voice message:', error);
+    }
+  };
+
+  const handleVoiceModeChange = (enabled: boolean) => {
+    setIsVoiceModeEnabled(enabled);
+    if (enabled) {
+      console.log('🗣️ Voice mode enabled');
+    } else {
+      console.log('🔇 Voice mode disabled');
+    }
+  };
+
   const handleNewSession = async () => {
     try {
       setIsSessionLoading(true);
@@ -694,7 +778,15 @@ export default function Chat() {
             {item.content}
           </Text>
 
-          {item.metadata?.toolName && (
+          {/* Voice message indicator */}
+          {item.metadata?.isVoice && (
+            <View style={styles.voiceBadge}>
+              <MaterialIcons name="mic" size={12} color={colors.primary} />
+              <Text style={styles.voiceText}>Voice</Text>
+            </View>
+          )}
+
+          {item.metadata?.toolName && !item.metadata?.isVoice && (
             <View style={styles.toolBadge}>
               <MaterialIcons name="build" size={12} color={colors.success} />
               <Text style={styles.toolText}>{item.metadata.toolName}</Text>
@@ -818,25 +910,36 @@ export default function Chat() {
 
 
 
+          {/* Voice Chat Component */}
+          <VoiceChat
+            sessionId={currentSession?.id}
+            onVoiceMessage={handleVoiceMessage}
+            onVoiceModeChange={handleVoiceModeChange}
+            disabled={isLoading}
+          />
+
           <View style={styles.inputContainer}>
             <TextInput
-              style={styles.textInput}
+              style={[
+                styles.textInput,
+                isVoiceModeEnabled && { opacity: 0.6 }
+              ]}
               value={inputText}
               onChangeText={setInputText}
-              placeholder="Type a message or /command..."
+              placeholder={isVoiceModeEnabled ? "Voice mode active - use mic above" : "Type a message or /command..."}
               placeholderTextColor="#8e8e93"
               multiline
               maxLength={500}
-              editable={!isLoading}
+              editable={!isLoading && !isVoiceModeEnabled}
             />
 
             <TouchableOpacity
               style={[
                 styles.sendButton,
-                (!inputText.trim() || isLoading) && styles.sendButtonDisabled
+                (!inputText.trim() || isLoading || isVoiceModeEnabled) && styles.sendButtonDisabled
               ]}
               onPress={handleSend}
-              disabled={!inputText.trim() || isLoading}
+              disabled={!inputText.trim() || isLoading || isVoiceModeEnabled}
             >
               {isLoading ? (
                 <ActivityIndicator size="small" color={colors.secondary} />
@@ -844,7 +947,7 @@ export default function Chat() {
                 <MaterialIcons
                   name="send"
                   size={20}
-                  color={(!inputText.trim() || isLoading) ? colors.primary : "white"}
+                  color={(!inputText.trim() || isLoading || isVoiceModeEnabled) ? colors.primary : "white"}
                 />
               )}
             </TouchableOpacity>

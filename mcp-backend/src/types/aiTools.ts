@@ -47,5 +47,7 @@ export interface UserContext {
   preferences?: {
     responseStyle: 'brief' | 'detailed' | 'conversational';
     includeActions: boolean;
+    isVoiceMode?: boolean;
+    cleanForSpeech?: boolean;
   };
 }
