@@ -25,6 +25,12 @@ export class VoiceService {
   private isRecording = false;
   private isInitialized = false;
   private lastRecordingUri: string | null = null;
+  private isContinuousMode = false;
+  private silenceTimeout: NodeJS.Timeout | null = null;
+  private volumeThreshold = 0.01; // Silence threshold
+  private silenceDelay = 2000; // 2 seconds of silence before auto-processing
+  private onContinuousMessage?: (message: any) => void;
+  private continuousSessionId?: string;
 
   /**
    * Initialize voice service and request microphone permissions
@@ -737,5 +743,257 @@ async speechToTextFromBase64(base64Audio: string): Promise<{
    */
   getIsRecording(): boolean {
     return this.isRecording;
+  }
+
+  /**
+   * Start continuous conversation mode
+   */
+  async startContinuousMode(sessionId: string, onMessage: (message: any) => void): Promise<void> {
+    try {
+      console.log('🔄 Starting continuous conversation mode...');
+      
+      this.isContinuousMode = true;
+      this.continuousSessionId = sessionId;
+      this.onContinuousMessage = onMessage;
+      
+      // Enable conversation mode on backend
+      await VoiceService.enableConversationMode(sessionId);
+      
+      // Start the first recording cycle
+      await this.startContinuousRecording();
+      
+      console.log('✅ Continuous mode started - listening...');
+    } catch (error) {
+      console.error('❌ Error starting continuous mode:', error);
+      this.isContinuousMode = false;
+      throw error;
+    }
+  }
+
+  /**
+   * Stop continuous conversation mode
+   */
+  async stopContinuousMode(): Promise<void> {
+    try {
+      console.log('🛑 Stopping continuous conversation mode...');
+      
+      this.isContinuousMode = false;
+      
+      // Clear any pending silence timeout
+      if (this.silenceTimeout) {
+        clearTimeout(this.silenceTimeout);
+        this.silenceTimeout = null;
+      }
+      
+      // Stop current recording if active
+      if (this.isRecording) {
+        await this.stopRecording();
+      }
+      
+      // Disable conversation mode on backend
+      await VoiceService.disableConversationMode();
+      
+      console.log('✅ Continuous mode stopped');
+    } catch (error) {
+      console.error('❌ Error stopping continuous mode:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Start a recording cycle with silence detection
+   */
+  private async startContinuousRecording(): Promise<void> {
+    if (!this.isContinuousMode) return;
+    
+    try {
+      await this.startRecording();
+      
+      // Set up silence detection
+      this.startSilenceDetection();
+      
+    } catch (error) {
+      console.error('❌ Error in continuous recording:', error);
+      // Retry after a short delay if still in continuous mode
+      if (this.isContinuousMode) {
+        setTimeout(() => this.startContinuousRecording(), 1000);
+      }
+    }
+  }
+
+  /**
+   * Start silence detection using recording metering
+   */
+  private startSilenceDetection(): void {
+    if (!this.recording) return;
+    
+    // For now, we'll use a simple timeout-based approach
+    // In a more advanced implementation, you could use Audio.Recording.getStatusAsync()
+    // to get volume levels and implement proper voice activity detection
+    
+    const checkForSilence = () => {
+      if (!this.isContinuousMode || !this.isRecording) return;
+      
+      // Reset silence timeout on each check
+      if (this.silenceTimeout) {
+        clearTimeout(this.silenceTimeout);
+      }
+      
+      // Set timeout to process recording after silence delay
+      this.silenceTimeout = setTimeout(async () => {
+        if (this.isContinuousMode && this.isRecording) {
+          console.log('🤫 Silence detected - processing speech...');
+          await this.processContinuousRecording();
+        }
+      }, this.silenceDelay);
+    };
+    
+    // Start checking for silence immediately
+    checkForSilence();
+  }
+
+  /**
+   * Process the current recording and restart listening
+   */
+  private async processContinuousRecording(): Promise<void> {
+    try {
+      // Stop current recording
+      const audioUri = await this.stopRecording();
+      
+      if (!audioUri || !this.continuousSessionId) return;
+      
+      console.log('🎤 Processing continuous recording...');
+      
+      // Process the audio
+      const result = await this.sendAudioForProcessing(audioUri, this.continuousSessionId);
+      
+      // Notify the UI component
+      if (this.onContinuousMessage && result.success) {
+        this.onContinuousMessage({
+          userText: result.userText,
+          aiText: result.aiText,
+          audioData: result.audioData,
+        });
+      }
+      
+      // Play the AI response
+      if (result.success && result.audioData) {
+        await this.playAudioResponse(result.audioData);
+      }
+      
+      // Restart listening if still in continuous mode
+      if (this.isContinuousMode) {
+        setTimeout(() => {
+          console.log('🔄 Restarting listening...');
+          this.startContinuousRecording();
+        }, 500); // Small delay before restarting
+      }
+      
+    } catch (error) {
+      console.error('❌ Error processing continuous recording:', error);
+      
+      // Restart listening on error if still in continuous mode
+      if (this.isContinuousMode) {
+        setTimeout(() => this.startContinuousRecording(), 2000);
+      }
+    }
+  }
+
+  /**
+   * Send audio for processing (extracted from existing processVoiceMessage)
+   */
+  private async sendAudioForProcessing(audioUri: string, sessionId: string): Promise<any> {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('No active session');
+    }
+
+    const formData = new FormData();
+
+    // Read and convert audio file to base64
+    const base64String = await FileSystem.readAsStringAsync(audioUri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    
+    console.log('🔧 Base64 string length:', base64String.length);
+
+    // Send the file for multer to handle (use proper format based on recording settings)
+    formData.append('audio', {
+      uri: audioUri,
+      type: 'audio/wav',
+      name: 'recording.wav',
+    } as any);
+    
+    // Also send base64 string in the body
+    formData.append('base64String', base64String);
+
+    const response = await fetch(`${MCP_BASE_URL}/conversation/speak`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const audioData = await response.arrayBuffer();
+    const userText = response.headers.get('X-User-Text') || '';
+    const aiText = response.headers.get('X-AI-Text') || '';
+    const toolUsed = response.headers.get('X-Tool-Used') || '';
+
+    console.log('🔊 Received audio response:', audioData.byteLength, 'bytes');
+    console.log('🎤 User said:', userText);
+    console.log('🧠 AI responded:', aiText);
+
+    return {
+      success: true,
+      audioData,
+      userText,
+      aiText,
+      toolUsed,
+    };
+  }
+
+  /**
+   * Play audio response
+   */
+  private async playAudioResponse(audioData: ArrayBuffer): Promise<void> {
+    try {
+      // Convert ArrayBuffer to base64
+      const buffer = Buffer.from(audioData);
+      const base64Audio = buffer.toString('base64');
+      const audioUri = `data:audio/wav;base64,${base64Audio}`;
+
+      // Create and play sound
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: audioUri },
+        { shouldPlay: true }
+      );
+
+      this.sound = sound;
+
+      // Wait for playback to complete
+      await new Promise<void>((resolve) => {
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (status.isLoaded && status.didJustFinish) {
+            resolve();
+          }
+        });
+      });
+
+    } catch (error) {
+      console.error('❌ Error playing audio response:', error);
+    }
+  }
+
+  /**
+   * Check if in continuous mode
+   */
+  getIsContinuousMode(): boolean {
+    return this.isContinuousMode;
   }
 }

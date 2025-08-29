@@ -36,6 +36,8 @@ export function VoiceChat({
   const [availableVoices, setAvailableVoices] = useState<Array<{name: string; displayName: string}>>([]);
   const [selectedVoice, setSelectedVoice] = useState<string>('');
   const [isRehearing, setIsRehearing] = useState(false);
+  const [isContinuousMode, setIsContinuousMode] = useState(false);
+  const [isListening, setIsListening] = useState(false);
 
   const voiceService = useRef<VoiceService>(new VoiceService());
   const recordingAnimation = useRef(new Animated.Value(0)).current;
@@ -171,6 +173,26 @@ export function VoiceChat({
       fontSize: 9,
       fontWeight: '600',
       marginLeft: 3,
+    },
+    continuousButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      backgroundColor: colors.primary + '20',
+      borderRadius: 16,
+      marginLeft: 8,
+      borderWidth: 1,
+      borderColor: colors.primary + '40',
+    },
+    continuousButtonActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    continuousButtonText: {
+      fontSize: 11,
+      fontWeight: '700',
+      marginLeft: 4,
     },
   });
 
@@ -316,6 +338,68 @@ export function VoiceChat({
     }
   };
 
+  const toggleContinuousMode = async () => {
+    if (disabled || !isVoiceModeEnabled) return;
+
+    try {
+      if (!isContinuousMode) {
+        // Start continuous mode
+        if (!sessionId) {
+          Alert.alert('Error', 'Session ID is required for continuous mode');
+          return;
+        }
+
+        await voiceService.current.startContinuousMode(sessionId, (message) => {
+          console.log('📢 Continuous message received:', message);
+          
+          // Update UI to show the conversation
+          if (onVoiceMessage) {
+            onVoiceMessage(message.userText, message.aiText, message.audioData);
+          }
+        });
+
+        setIsContinuousMode(true);
+        setIsListening(true);
+        
+        // Start listening animation
+        startListeningAnimation();
+        
+      } else {
+        // Stop continuous mode
+        await voiceService.current.stopContinuousMode();
+        
+        setIsContinuousMode(false);
+        setIsListening(false);
+        
+        // Stop listening animation
+        recordingAnimation.setValue(0);
+      }
+    } catch (error) {
+      console.error('❌ Error toggling continuous mode:', error);
+      Alert.alert('Error', 'Failed to toggle continuous mode');
+      setIsContinuousMode(false);
+      setIsListening(false);
+    }
+  };
+
+  const startListeningAnimation = () => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(recordingAnimation, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+        Animated.timing(recordingAnimation, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+      ])
+    );
+    pulse.start();
+  };
+
   const startRecording = async () => {
     if (!isVoiceModeEnabled || disabled || isRecording || isProcessing) return;
 
@@ -455,6 +539,8 @@ export function VoiceChat({
   const getStatusText = () => {
     if (!hasPermission) return 'Microphone access required';
     if (!isVoiceModeEnabled) return 'Voice mode disabled';
+    if (isContinuousMode && isListening) return 'Auto-listening... speak now';
+    if (isContinuousMode && !isListening) return 'Auto mode - preparing...';
     if (isRecording) return 'Listening...';
     if (isProcessing) return 'Processing your message...';
     if (isPlaying) return 'Playing AI response...';
@@ -616,6 +702,42 @@ export function VoiceChat({
           />
           <Text style={[styles.testButtonText, { color: colors.warning }]}>
             Test
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Continuous Mode Button */}
+      {isVoiceModeEnabled && sessionId && (
+        <TouchableOpacity 
+          style={[
+            styles.continuousButton,
+            isContinuousMode && styles.continuousButtonActive
+          ]}
+          onPress={toggleContinuousMode}
+          disabled={isRecording || isProcessing || isPlaying || isRehearing}
+        >
+          <MaterialIcons 
+            name={isContinuousMode ? "stop" : "all-inclusive"} 
+            size={18} 
+            color={isContinuousMode ? colors.background : colors.primary} 
+          />
+          {isListening && (
+            <Animated.View
+              style={{
+                marginLeft: 4,
+                width: 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: isContinuousMode ? colors.background : colors.success,
+                opacity: recordingAnimation,
+              }}
+            />
+          )}
+          <Text style={[
+            styles.continuousButtonText, 
+            { color: isContinuousMode ? colors.background : colors.primary }
+          ]}>
+            {isContinuousMode ? 'Stop' : 'Auto'}
           </Text>
         </TouchableOpacity>
       )}
