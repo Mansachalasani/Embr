@@ -145,6 +145,7 @@ router.get('/status', authenticateToken, async (req: AuthenticatedRequest, res) 
  * POST /api/conversation/speak
  */
 router.post('/speak', authenticateToken, upload.single('audio'), async (req: AuthenticatedRequest, res) => {
+  console.log("🎤 Processing /speak endpoint")
   try {
     if (!req.user) {
       return res.status(401).json({
@@ -160,13 +161,42 @@ router.post('/speak', authenticateToken, upload.single('audio'), async (req: Aut
       });
     }
 
-    console.log(`🎤 Processing speech for user: ${req.user.email}`);
+    console.log(`🎤 Processing speech for user: ${req.user?.email}`);
+    console.log(`📁 File info:`, {
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      bufferLength: req.file.buffer.length
+    });
 
-    // Convert audio to text
-    const audioBuffer = req.file.buffer;
-    const audioStream = require('stream').Readable.from(audioBuffer);
+    // Log first few bytes to identify file format
+    const firstBytes = req.file.buffer.slice(0, 16);
+    console.log('🔍 File header (first 16 bytes):', firstBytes.toString('hex'));
+    console.log('🔍 File header as text:', firstBytes.toString('ascii').replace(/[^\x20-\x7E]/g, '.'));
     
-    const speechResult = await speechService.speechToText(audioStream);
+    // Detect audio format based on magic bytes
+    let detectedFormat = 'unknown';
+    if (firstBytes.slice(0, 4).toString('hex') === '52494646') {
+      detectedFormat = 'WAV (RIFF)';
+    } else if (firstBytes.slice(4, 8).toString('ascii') === 'ftyp') {
+      detectedFormat = 'MP4/M4A';
+    } else if (firstBytes.slice(0, 3).toString('hex') === 'fff8' || firstBytes.slice(0, 3).toString('hex') === 'fff9') {
+      detectedFormat = 'MP3';
+    }
+    console.log('🔍 Detected audio format:', detectedFormat);
+    
+    // Try base64 approach first if it's available in the body
+    let speechResult;
+    if (req.body.base64String) {
+      console.log('🔧 Using base64 audio processing...');
+      speechResult = await (speechService as any).speechToTextFromBase64(req.body.base64String);
+    } else {
+      console.log('🔧 Using buffer stream processing...');
+      const audioBuffer = req.file.buffer;
+      const audioStream = require('stream').Readable.from(audioBuffer);
+      console.log('📊 Audio buffer size:', audioBuffer.length, 'bytes');
+      speechResult = await speechService.speechToText(audioStream);
+    }
     
     if (!speechResult.success || !speechResult.text) {
       return res.status(400).json({
@@ -240,13 +270,16 @@ router.post('/speak', authenticateToken, upload.single('audio'), async (req: Aut
 
     console.log(`🔊 Speech synthesis completed, returning ${ttsResult.audioData.length} bytes`);
 
+    // Sanitize header values to prevent invalid characters
+    const sanitizeHeader = (text: string) => text.replace(/[^\x20-\x7E]/g, '').substring(0, 200);
+
     // Return audio response
     res.set({
       'Content-Type': 'audio/wav',
       'Content-Length': ttsResult.audioData.length.toString(),
-      'X-User-Text': speechResult.text,
-      'X-AI-Text': aiResponse.naturalResponse,
-      'X-Tool-Used': aiResponse.toolUsed || '',
+      'X-User-Text': sanitizeHeader(speechResult.text),
+      'X-AI-Text': sanitizeHeader(aiResponse.naturalResponse),
+      'X-Tool-Used': sanitizeHeader(aiResponse.toolUsed || ''),
     });
 
     res.send(ttsResult.audioData);
@@ -405,6 +438,86 @@ router.get('/voices', authenticateToken, async (req: AuthenticatedRequest, res) 
     res.status(500).json({
       success: false,
       error: 'Failed to get available voices',
+    });
+  }
+});
+
+/**
+ * Test audio processing directly (for debugging)
+ * POST /api/conversation/test-audio
+ */
+router.post('/test-audio', authenticateToken, upload.single('audio'), async (req: AuthenticatedRequest, res) => {
+  console.log("🧪 Testing audio processing endpoint")
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'User authentication required',
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'Audio file is required',
+      });
+    }
+
+    console.log(`🧪 Testing audio for user: ${req.user?.email}`);
+    console.log(`📁 Test file info:`, {
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      bufferLength: req.file.buffer.length,
+      hasBase64: !!req.body.base64String,
+      base64Length: req.body.base64String ? req.body.base64String.length : 0
+    });
+    
+    // Test both approaches
+    const results = {
+      bufferStream: null as any,
+      base64: null as any,
+    };
+    
+    // Test buffer stream approach
+    try {
+      const audioBuffer = req.file.buffer;
+      const audioStream = require('stream').Readable.from(audioBuffer);
+      console.log('🧪 Testing buffer stream approach...');
+      results.bufferStream = await speechService.speechToText(audioStream);
+    } catch (error) {
+      console.error('❌ Buffer stream test failed:', error);
+      results.bufferStream = { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+    
+    // Test base64 approach if available
+    if (req.body.base64String) {
+      try {
+        console.log('🧪 Testing base64 approach...');
+        results.base64 = await speechService.speechToTextFromBase64(req.body.base64String);
+      } catch (error) {
+        console.error('❌ Base64 test failed:', error);
+        results.base64 = { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Audio processing test completed',
+      results: results,
+      fileInfo: {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error in audio test:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Audio test failed',
+      details: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });

@@ -85,7 +85,9 @@ export class AzureSpeechService {
   }> {
     return new Promise((resolve) => {
       try {
-        // Convert stream to audio config
+        console.log('🔧 Processing audio stream for speech-to-text...');
+        // Convert stream to audio config with specific format
+        console.log('🎤 Creating audio stream for Azure Speech recognition...');
         const pushStream = sdk.AudioInputStream.createPushStream();
         
         audioStream.on('data', (chunk: Buffer) => {
@@ -99,20 +101,27 @@ export class AzureSpeechService {
 
         const audioConfig = sdk.AudioConfig.fromStreamInput(pushStream);
         const recognizer = new sdk.SpeechRecognizer(this.speechConfig, audioConfig);
-
+        console.log(recognizer)
         let finalText = '';
 
         recognizer.recognizeOnceAsync(
           (result) => {
+            console.log('🎤 Azure Speech result reason:', result.reason);
+            console.log('🎤 Azure Speech result text:', result.text);
+            console.log('🎤 Azure Speech result duration:', result.duration);
+            console.log('🎤 Azure Speech result offset:', result.offset);
+            
             if (result.reason === sdk.ResultReason.RecognizedSpeech) {
               finalText = result.text;
-              console.log('🎤 Speech recognized:', finalText);
+              console.log('✅ Speech recognized from stream:', finalText);
               resolve({ success: true, text: finalText });
             } else if (result.reason === sdk.ResultReason.NoMatch) {
-              console.log('🎤 No speech could be recognized');
+              console.log('❌ No speech could be recognized from stream');
+              console.log('🔍 NoMatch details:', result);
               resolve({ success: false, error: 'No speech recognized' });
             } else {
-              console.log('🎤 Speech recognition error:', result.errorDetails);
+              console.log('❌ Speech recognition error from stream:', result.errorDetails);
+              console.log('🔍 Error result:', result);
               resolve({ success: false, error: result.errorDetails });
             }
             recognizer.close();
@@ -234,6 +243,70 @@ export class AzureSpeechService {
         pushStream.write(arrayBuffer);
       }
     };
+  }
+
+  /**
+   * Speech-to-text from base64 audio data
+   */
+  async speechToTextFromBase64(base64Audio: string): Promise<{
+    success: boolean;
+    text?: string;
+    error?: string;
+  }> {
+    return new Promise((resolve) => {
+      try {
+        console.log('🔧 Processing base64 audio, length:', base64Audio.length);
+        
+        const pushStream = sdk.AudioInputStream.createPushStream();
+
+        // Convert base64 → Buffer → ArrayBuffer and push
+        const audioBuffer = Buffer.from(base64Audio, 'base64');
+        console.log('📊 Converted to buffer, size:', audioBuffer.length, 'bytes');
+        
+        pushStream.write(
+          audioBuffer.buffer.slice(
+            audioBuffer.byteOffset,
+            audioBuffer.byteOffset + audioBuffer.byteLength
+          )
+        );
+        pushStream.close();
+
+        const audioConfig = sdk.AudioConfig.fromStreamInput(pushStream);
+        const recognizer = new sdk.SpeechRecognizer(this.speechConfig, audioConfig);
+        console.log('🎙️ Created speech recognizer for base64 audio');
+
+        recognizer.recognizeOnceAsync(
+          (result) => {
+            console.log('🎤 Azure Speech result reason:', result.reason);
+            console.log('🎤 Azure Speech result text:', result.text);
+            
+            if (result.reason === sdk.ResultReason.RecognizedSpeech) {
+              console.log('✅ Speech recognized from base64:', result.text);
+              resolve({ success: true, text: result.text });
+            } else if (result.reason === sdk.ResultReason.NoMatch) {
+              console.log('❌ No speech could be recognized from base64');
+              console.log('🔍 Result details:', result);
+              resolve({ success: false, error: 'No speech recognized' });
+            } else {
+              console.log('❌ Speech recognition error from base64:', result.errorDetails);
+              resolve({ success: false, error: result.errorDetails });
+            }
+            recognizer.close();
+          },
+          (error) => {
+            console.error('❌ Speech recognition failed for base64:', error);
+            resolve({ success: false, error: error.toString() });
+            recognizer.close();
+          }
+        );
+      } catch (error) {
+        console.error('❌ Base64 speech-to-text error:', error);
+        resolve({
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    });
   }
 
   /**

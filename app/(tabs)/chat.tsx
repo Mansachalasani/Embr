@@ -840,7 +840,7 @@ export default function Chat() {
             </Text>
           </View> */}
           <TouchableOpacity style={styles.newChatButton} onPress={handleNewSession}>
-            <Ionicons name="add" size={20} color={colors.primary} />
+            <MaterialIcons name="add" size={20} color={colors.primary} />
           </TouchableOpacity>
         </View>
 
@@ -953,7 +953,6 @@ export default function Chat() {
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
-
       </LinearGradient>
     </SafeAreaView>
   );

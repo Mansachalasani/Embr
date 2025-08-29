@@ -2,7 +2,7 @@ import React from 'react';
 import { Tabs, Redirect } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 
 export default function TabLayout() {
   const { user } = useAuth();
@@ -48,7 +48,7 @@ export default function TabLayout() {
           title: 'Chat',
         headerShown:false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubbles-outline" color={color} size={size} />
+            <MaterialIcons name="chat" color={color} size={size} />
           ),
         }}
       />
@@ -64,7 +64,7 @@ export default function TabLayout() {
           title: 'Profile',
           headerTitle: '👤 Profile',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-circle-outline" color={color} size={size} />
+            <MaterialIcons name="person" color={color} size={size} />
           ),
         }}
       />
@@ -74,7 +74,7 @@ export default function TabLayout() {
           title: 'Settings',
           headerTitle: '⚙️ Settings',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings-outline" color={color} size={size} />
+            <MaterialIcons name="settings" color={color} size={size} />
           ),
         }}
       />

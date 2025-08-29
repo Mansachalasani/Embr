@@ -24,6 +24,7 @@ export class VoiceService {
   private sound: Audio.Sound | null = null;
   private isRecording = false;
   private isInitialized = false;
+  private lastRecordingUri: string | null = null;
 
   /**
    * Initialize voice service and request microphone permissions
@@ -163,9 +164,34 @@ export class VoiceService {
         this.isInitialized = true;
       }
   
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
+      // Use specific options optimized for Azure Speech Recognition
+      const recordingOptions = {
+        android: {
+          extension: '.wav',
+          outputFormat: Audio.AndroidOutputFormat.DEFAULT,
+          audioEncoder: Audio.AndroidAudioEncoder.DEFAULT,
+          sampleRate: 16000, // Azure Speech optimal
+          numberOfChannels: 1,
+          bitRate: 128000,
+        },
+        ios: {
+          extension: '.wav',
+          outputFormat: Audio.IOSOutputFormat.LINEARPCM,
+          audioQuality: Audio.IOSAudioQuality.HIGH,
+          sampleRate: 16000, // Azure Speech optimal  
+          numberOfChannels: 1,
+          bitRate: 128000,
+          linearPCMBitDepth: 16,
+          linearPCMIsBigEndian: false,
+          linearPCMIsFloat: false,
+        },
+        web: {
+          mimeType: 'audio/wav',
+          bitsPerSecond: 128000,
+        },
+      };
+
+      const { recording } = await Audio.Recording.createAsync(recordingOptions);
   
       this.recording = recording;
       this.isRecording = true;
@@ -195,6 +221,23 @@ export class VoiceService {
       }
       
       console.log('🎤 Stopped recording, file URI:', uri);
+      
+      // Store the last recording for rehear functionality
+      this.lastRecordingUri = uri;
+      
+      // Get file info for debugging
+      if (Platform.OS !== 'web') {
+        try {
+          const fileInfo = await FileSystem.getInfoAsync(uri);
+          console.log('📁 File info:', {
+            exists: fileInfo.exists,
+            size: fileInfo.exists ? fileInfo.size : 'N/A',
+            uri: uri
+          });
+        } catch (e) {
+          console.warn('⚠️ Could not get file info:', e);
+        }
+      }
       
       // Clean up the recording object
       this.recording = null;
@@ -234,6 +277,204 @@ export class VoiceService {
   }
 
   /**
+   * Play back the last recorded audio
+   */
+  async rehearLastRecording(): Promise<void> {
+    if (!this.lastRecordingUri) {
+      throw new Error('No recording available to rehear');
+    }
+
+    try {
+      console.log('🔊 Playing back last recording:', this.lastRecordingUri);
+      
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: this.lastRecordingUri },
+        { shouldPlay: true, volume: 1.0 }
+      );
+
+      return new Promise((resolve, reject) => {
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (status.isLoaded) {
+            if (status.didJustFinish) {
+              sound.unloadAsync().catch(console.error);
+              resolve();
+            }
+          } else if (status.error) {
+            console.error('❌ Rehear playback error:', status.error);
+            sound.unloadAsync().catch(console.error);
+            reject(new Error(status.error));
+          }
+        });
+      });
+    } catch (error) {
+      console.error('❌ Error rehearing recording:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get whether there's a recording available to rehear
+   */
+  hasRecordingToRehear(): boolean {
+    return !!this.lastRecordingUri;
+  }
+
+  /**
+   * Test audio processing without full AI pipeline (for debugging)
+   */
+  static async testAudioProcessing(audioUri: string): Promise<{
+    success: boolean;
+    results?: any;
+    fileInfo?: any;
+    error?: string;
+  }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No active session');
+      }
+
+      console.log('🧪 Testing audio processing...', audioUri);
+
+      // Create FormData for file upload
+      const formData = new FormData();
+      
+      if (Platform.OS === 'web') {
+        const response = await fetch(audioUri);
+        const audioBlob = await response.blob();
+        formData.append('audio', audioBlob, 'test-recording.webm');
+      } else {
+        const fileInfo = await FileSystem.getInfoAsync(audioUri);
+        if (!fileInfo.exists) {
+          throw new Error('Audio file not found');
+        }
+        
+        const base64String = await FileSystem.readAsStringAsync(audioUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+
+        formData.append('audio', {
+          uri: audioUri,
+          type: 'audio/m4a',
+          name: 'test-recording.m4a',
+        } as any);
+        
+        formData.append('base64String', base64String);
+      }
+
+      const response = await fetch(`${MCP_BASE_URL}/conversation/test-audio`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('🧪 Audio test results:', result);
+
+      return {
+        success: true,
+        results: result.results,
+        fileInfo: result.fileInfo,
+      };
+    } catch (error) {
+      console.error('❌ Error testing audio processing:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Audio test failed',
+      };
+    }
+  }
+
+// async convertBlobToWav(blob: Blob): Promise<Blob> {
+//     const arrayBuffer = await blob.arrayBuffer();
+//     const audioContext = new AudioContext();
+//     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+  
+//     const channelData = [];
+//     for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+//       channelData.push(audioBuffer.getChannelData(i));
+//     }
+  
+//     const wavBuffer = await WavEncoder.encode({
+//       sampleRate: audioBuffer.sampleRate,
+//       channelData,
+//     });
+  
+//     return new Blob([wavBuffer], { type: "audio/wav" });
+//   }
+
+//   async  convertToWav(inputUri: string): Promise<string> {
+//     const outputUri = inputUri.replace(/\.m4a$/, ".wav");
+  
+//     await FFmpegKit.execute(
+//       `-i ${inputUri} -ar 44100 -ac 2 -b:a 192k ${outputUri}`
+//     );
+  
+//     return outputUri;
+//   }
+  
+async speechToTextFromBase64(base64Audio: string): Promise<{
+  success: boolean;
+  text?: string;
+  error?: string;
+}> {
+  return new Promise((resolve) => {
+    try {
+      const pushStream = sdk.AudioInputStream.createPushStream();
+
+      // Convert base64 → Buffer → ArrayBuffer and push
+      const audioBuffer = Buffer.from(base64Audio, "base64");
+      pushStream.write(
+        audioBuffer.buffer.slice(
+          audioBuffer.byteOffset,
+          audioBuffer.byteOffset + audioBuffer.byteLength
+        )
+      );
+      pushStream.close();
+
+      const audioConfig = sdk.AudioConfig.fromStreamInput(pushStream);
+      const recognizer = new sdk.SpeechRecognizer(this.speechConfig, audioConfig);
+
+      recognizer.recognizeOnceAsync(
+        (result) => {
+          if (result.reason === sdk.ResultReason.RecognizedSpeech) {
+            console.log("🎤 Speech recognized:", result.text);
+            resolve({ success: true, text: result.text });
+          } else if (result.reason === sdk.ResultReason.NoMatch) {
+            console.log("🎤 No speech could be recognized");
+            resolve({ success: false, error: "No speech recognized" });
+          } else {
+            console.log("🎤 Speech recognition error:", result.errorDetails);
+            resolve({ success: false, error: result.errorDetails });
+          }
+          recognizer.close();
+        },
+        (error) => {
+          console.error("🎤 Speech recognition failed:", error);
+          resolve({ success: false, error: error.toString() });
+          recognizer.close();
+        }
+      );
+    } catch (error) {
+      console.error("🎤 Speech-to-text error:", error);
+      resolve({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+}
+
+
+  
+  /**
    * Send audio file to backend and get response
    */
   static async processVoiceMessage(audioUri: string): Promise<{
@@ -261,18 +502,35 @@ export class VoiceService {
         const audioBlob = await response.blob();
         formData.append('audio', audioBlob, 'recording.webm');
       } else {
-        // For mobile platforms, use the file URI directly
+        // For mobile platforms, read file as base64 and send both file and base64
         const fileInfo = await FileSystem.getInfoAsync(audioUri);
         if (!fileInfo.exists) {
           throw new Error('Audio file not found');
         }
+        
+        console.log('📁 Mobile file info:', {
+          exists: fileInfo.exists,
+          size: fileInfo.size,
+          uri: audioUri
+        });
+        
+        const base64String = await FileSystem.readAsStringAsync(audioUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        
+        console.log('🔧 Base64 string length:', base64String.length);
 
+        // Send the file for multer to handle (use proper format based on recording settings)
         formData.append('audio', {
           uri: audioUri,
-          type: 'audio/m4a',
-          name: 'recording.m4a',
+          type: 'audio/wav',
+          name: 'recording.wav',
         } as any);
+        
+        // Also send base64 string in the body
+        formData.append('base64String', base64String);
       }
+     
 
       const response = await fetch(`${MCP_BASE_URL}/conversation/speak`, {
         method: 'POST',
@@ -281,6 +539,7 @@ export class VoiceService {
         },
         body: formData,
       });
+
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));

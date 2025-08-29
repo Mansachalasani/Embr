@@ -35,6 +35,7 @@ export function VoiceChat({
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [availableVoices, setAvailableVoices] = useState<Array<{name: string; displayName: string}>>([]);
   const [selectedVoice, setSelectedVoice] = useState<string>('');
+  const [isRehearing, setIsRehearing] = useState(false);
 
   const voiceService = useRef<VoiceService>(new VoiceService());
   const recordingAnimation = useRef(new Animated.Value(0)).current;
@@ -142,6 +143,34 @@ export function VoiceChat({
       fontSize: 11,
       color: colors.textSecondary,
       marginLeft: 4,
+    },
+    rehearButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      backgroundColor: colors.surfaceVariant,
+      borderRadius: 12,
+      marginLeft: 8,
+    },
+    rehearButtonText: {
+      fontSize: 10,
+      fontWeight: '600',
+      marginLeft: 4,
+    },
+    testButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 6,
+      paddingVertical: 3,
+      backgroundColor: colors.warning + '20',
+      borderRadius: 10,
+      marginLeft: 8,
+    },
+    testButtonText: {
+      fontSize: 9,
+      fontWeight: '600',
+      marginLeft: 3,
     },
   });
 
@@ -347,6 +376,67 @@ export function VoiceChat({
     }
   };
 
+  const rehearLastRecording = async () => {
+    if (!voiceService.current.hasRecordingToRehear()) {
+      Alert.alert('No Recording', 'No recording available to rehear');
+      return;
+    }
+
+    try {
+      setIsRehearing(true);
+      await voiceService.current.rehearLastRecording();
+    } catch (error) {
+      console.error('❌ Error rehearing recording:', error);
+      Alert.alert('Error', 'Failed to play back recording');
+    } finally {
+      setIsRehearing(false);
+    }
+  };
+
+  const testAudioProcessing = async () => {
+    if (!voiceService.current.hasRecordingToRehear()) {
+      Alert.alert('No Recording', 'Please record something first to test audio processing');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      const result = await VoiceService.testAudioProcessing(voiceService.current.lastRecordingUri!);
+      
+      if (result.success) {
+        const { results } = result;
+        let message = 'Audio Test Results:\n\n';
+        
+        if (results.bufferStream) {
+          message += `Buffer Stream: ${results.bufferStream.success ? 'SUCCESS' : 'FAILED'}\n`;
+          if (results.bufferStream.success) {
+            message += `Text: "${results.bufferStream.text}"\n`;
+          } else {
+            message += `Error: ${results.bufferStream.error}\n`;
+          }
+        }
+        
+        if (results.base64) {
+          message += `\nBase64: ${results.base64.success ? 'SUCCESS' : 'FAILED'}\n`;
+          if (results.base64.success) {
+            message += `Text: "${results.base64.text}"\n`;
+          } else {
+            message += `Error: ${results.base64.error}\n`;
+          }
+        }
+        
+        Alert.alert('Audio Test Results', message);
+      } else {
+        Alert.alert('Test Failed', result.error || 'Audio test failed');
+      }
+    } catch (error) {
+      console.error('❌ Error testing audio:', error);
+      Alert.alert('Error', 'Failed to test audio processing');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const getRecordButtonStyle = () => {
     if (disabled || !isVoiceModeEnabled) return styles.disabledButton;
     if (isRecording) return styles.recordingButton;
@@ -356,8 +446,8 @@ export function VoiceChat({
   };
 
   const getRecordButtonIcon = () => {
-    if (isProcessing) return 'hourglass-outline';
-    if (isPlaying) return 'volume-high-outline';
+    if (isProcessing) return 'hourglass-empty';
+    if (isPlaying) return 'volume-up';
     if (isRecording) return 'stop';
     return 'mic';
   };
@@ -368,15 +458,16 @@ export function VoiceChat({
     if (isRecording) return 'Listening...';
     if (isProcessing) return 'Processing your message...';
     if (isPlaying) return 'Playing AI response...';
+    if (isRehearing) return 'Playing your recording...';
     return 'Tap to speak';
   };
 
   const getStatusIcon = () => {
-    if (!hasPermission) return 'warning-outline';
-    if (!isVoiceModeEnabled) return 'mic-off-outline';
+    if (!hasPermission) return 'warning-amber';
+    if (!isVoiceModeEnabled) return 'mic-off';
     if (isRecording) return 'mic';
-    if (isProcessing) return 'cog-outline';
-    if (isPlaying) return 'volume-high-outline';
+    if (isProcessing) return 'animation';
+    if (isPlaying) return 'volume-up';
     return 'mic-outline';
   };
 
@@ -399,7 +490,7 @@ export function VoiceChat({
         onPress={toggleVoiceMode}
         disabled={disabled}
       >
-        <Ionicons
+        <MaterialIcons
           name={isVoiceModeEnabled ? "mic" : "mic-off"}
           size={16}
           color={isVoiceModeEnabled ? colors.primary : colors.textSecondary}
@@ -424,7 +515,7 @@ export function VoiceChat({
           {isProcessing ? (
             <ActivityIndicator size="small" color="white" />
           ) : (
-            <Ionicons
+            <MaterialIcons
               name={getRecordButtonIcon()}
               size={20}
               color="white"
@@ -444,7 +535,7 @@ export function VoiceChat({
         </TouchableOpacity>
       ) : (
         <View style={styles.statusContainer}>
-          <Ionicons
+          <MaterialIcons
             name={getStatusIcon()}
             size={16}
             color={
@@ -492,6 +583,43 @@ export function VoiceChat({
           </Text>
         </TouchableOpacity>
       )}
+
+      {/* Rehear Button */}
+      {isVoiceModeEnabled && voiceService.current.hasRecordingToRehear() && (
+        <TouchableOpacity 
+          style={styles.rehearButton}
+          onPress={rehearLastRecording}
+          disabled={isRecording || isProcessing || isPlaying || isRehearing}
+        >
+          <MaterialIcons 
+            name={isRehearing ? "stop" : "replay"} 
+            size={16} 
+            color={isRehearing ? colors.error : colors.primary} 
+          />
+          <Text style={[styles.rehearButtonText, { color: isRehearing ? colors.error : colors.primary }]}>
+            {isRehearing ? 'Stop' : 'Rehear'}
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Test Audio Button */}
+      {isVoiceModeEnabled && voiceService.current.hasRecordingToRehear() && (
+        <TouchableOpacity 
+          style={styles.testButton}
+          onPress={testAudioProcessing}
+          disabled={isRecording || isProcessing || isPlaying || isRehearing}
+        >
+          <MaterialIcons 
+            name="bug-report" 
+            size={14} 
+            color={colors.warning} 
+          />
+          <Text style={[styles.testButtonText, { color: colors.warning }]}>
+            Test
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
+
