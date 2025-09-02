@@ -51,8 +51,18 @@ export class AIService {
       }
       console.log('🎯 Selected tool:', toolSelection.tool, 'with confidence:', toolSelection.confidence);
       
-      // Step 2: Execute the selected tool
-      const toolResult = await this.executeTool(toolSelection, userId);
+      // Step 2: Execute the selected tool (handle null tools for conversational responses)
+      let toolResult;
+      if (toolSelection.tool === null) {
+        // Handle conversational responses without tools
+        toolResult = {
+          success: true,
+          data: null,
+          toolUsed: null
+        };
+      } else {
+        toolResult = await this.executeTool(toolSelection, userId);
+      }
       
       // Step 2.5: Check if we need tool chaining
       let chainedResult = null;

@@ -39,7 +39,8 @@ const corsOrigins = process.env.CORS_ORIGINS?.split(',').map(origin => origin.tr
   'http://localhost:8081', 
   'http://localhost:19000',
   'exp://localhost:19000',
-  'exp://127.0.0.1:19000'
+  'exp://127.0.0.1:19000',
+  'http://localhost:8084',
 ];
 
 console.log('🌐 CORS Origins:', corsOrigins);

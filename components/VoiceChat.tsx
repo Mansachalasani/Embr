@@ -33,8 +33,6 @@ export function VoiceChat({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [availableVoices, setAvailableVoices] = useState<Array<{name: string; displayName: string}>>([]);
-  const [selectedVoice, setSelectedVoice] = useState<string>('');
   const [isRehearing, setIsRehearing] = useState(false);
   const [isContinuousMode, setIsContinuousMode] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -194,6 +192,22 @@ export function VoiceChat({
       fontWeight: '700',
       marginLeft: 4,
     },
+    sendButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+      paddingVertical: 6,
+      backgroundColor: colors.primary + '15',
+      borderRadius: 12,
+      marginLeft: 8,
+      borderWidth: 1,
+      borderColor: colors.primary + '30',
+    },
+    sendButtonText: {
+      fontSize: 10,
+      fontWeight: '600',
+      marginLeft: 3,
+    },
   });
 
   // Initialize voice service and check permissions
@@ -298,28 +312,39 @@ export function VoiceChat({
     if (disabled) return;
 
     try {
-      if (!hasPermission) {
-        Alert.alert(
-          'Microphone Permission Required',
-          'Please enable microphone access to use voice features.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Try Again', onPress: initializeVoiceService }
-          ]
-        );
-        return;
-      }
-
       const newVoiceMode = !isVoiceModeEnabled;
       
       if (newVoiceMode) {
+        // Auto-request permissions when enabling voice mode
+        if (!hasPermission) {
+          console.log('🎤 Auto-requesting microphone permissions...');
+          const permissionGranted = await VoiceService.initialize();
+          if (!permissionGranted) {
+            Alert.alert(
+              'Microphone Access Required',
+              'Voice features need microphone access. Please enable it in your device settings and try again.',
+              [{ text: 'OK', style: 'default' }]
+            );
+            return;
+          }
+          setHasPermission(true);
+        }
+
         const result = await VoiceService.enableConversationMode(sessionId);
         if (result.success) {
           setIsVoiceModeEnabled(true);
+          console.log('✅ Voice mode enabled successfully');
         } else {
           Alert.alert('Error', 'Failed to enable voice mode');
         }
       } else {
+        // Disable continuous mode if it's active
+        if (isContinuousMode) {
+          await voiceService.current.stopContinuousMode();
+          setIsContinuousMode(false);
+          setIsListening(false);
+        }
+
         const result = await VoiceService.disableConversationMode();
         if (result.success) {
           setIsVoiceModeEnabled(false);
@@ -328,6 +353,7 @@ export function VoiceChat({
             voiceService.current.cancelRecording();
             setIsRecording(false);
           }
+          console.log('✅ Voice mode disabled successfully');
         } else {
           Alert.alert('Error', 'Failed to disable voice mode');
         }
@@ -537,15 +563,15 @@ export function VoiceChat({
   };
 
   const getStatusText = () => {
-    if (!hasPermission) return 'Microphone access required';
-    if (!isVoiceModeEnabled) return 'Voice mode disabled';
-    if (isContinuousMode && isListening) return 'Auto-listening... speak now';
-    if (isContinuousMode && !isListening) return 'Auto mode - preparing...';
-    if (isRecording) return 'Listening...';
-    if (isProcessing) return 'Processing your message...';
-    if (isPlaying) return 'Playing AI response...';
+    if (!hasPermission) return 'Tap voice button to enable microphone';
+    if (!isVoiceModeEnabled) return 'Tap voice button to start';
+    if (isContinuousMode && isListening) return 'Listening... take your time, speak completely';
+    if (isContinuousMode && !isListening) return 'Processing your complete message...';
+    if (isRecording) return 'Recording... speak your full message';
+    if (isProcessing) return 'AI is processing your complete message...';
+    if (isPlaying) return 'Playing response...';
     if (isRehearing) return 'Playing your recording...';
-    return 'Tap to speak';
+    return 'Tap mic or use Auto Chat for hands-free conversation';
   };
 
   const getStatusIcon = () => {
@@ -652,56 +678,23 @@ export function VoiceChat({
         </View>
       )}
 
-      {/* Voice Settings */}
-      {isVoiceModeEnabled && availableVoices.length > 0 && (
+
+      {/* Manual Send Button - Show when in continuous mode and listening */}
+      {isContinuousMode && isListening && (
         <TouchableOpacity 
-          style={styles.voiceSettings}
-          onPress={() => {
-            // Cycle through available voices
-            const currentIndex = availableVoices.findIndex(v => v.name === selectedVoice);
-            const nextIndex = (currentIndex + 1) % availableVoices.length;
-            changeVoice(availableVoices[nextIndex].name);
+          style={styles.sendButton}
+          onPress={async () => {
+            // Manually trigger processing of current recording
+            if (voiceService.current.getIsRecording()) {
+              console.log('👆 User manually ended speech');
+              // This will trigger the processContinuousRecording
+              await voiceService.current.stopRecording();
+            }
           }}
         >
-          <MaterialIcons name="record-voice-over" size={12} color={colors.primary} />
-          <Text style={styles.voiceSettingsText}>
-            {availableVoices.find(v => v.name === selectedVoice)?.displayName || 'Voice'}
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Rehear Button */}
-      {isVoiceModeEnabled && voiceService.current.hasRecordingToRehear() && (
-        <TouchableOpacity 
-          style={styles.rehearButton}
-          onPress={rehearLastRecording}
-          disabled={isRecording || isProcessing || isPlaying || isRehearing}
-        >
-          <MaterialIcons 
-            name={isRehearing ? "stop" : "replay"} 
-            size={16} 
-            color={isRehearing ? colors.error : colors.primary} 
-          />
-          <Text style={[styles.rehearButtonText, { color: isRehearing ? colors.error : colors.primary }]}>
-            {isRehearing ? 'Stop' : 'Rehear'}
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Test Audio Button */}
-      {isVoiceModeEnabled && voiceService.current.hasRecordingToRehear() && (
-        <TouchableOpacity 
-          style={styles.testButton}
-          onPress={testAudioProcessing}
-          disabled={isRecording || isProcessing || isPlaying || isRehearing}
-        >
-          <MaterialIcons 
-            name="bug-report" 
-            size={14} 
-            color={colors.warning} 
-          />
-          <Text style={[styles.testButtonText, { color: colors.warning }]}>
-            Test
+          <MaterialIcons name="send" size={18} color={colors.primary} />
+          <Text style={[styles.sendButtonText, { color: colors.primary }]}>
+            Send
           </Text>
         </TouchableOpacity>
       )}
@@ -717,7 +710,7 @@ export function VoiceChat({
           disabled={isRecording || isProcessing || isPlaying || isRehearing}
         >
           <MaterialIcons 
-            name={isContinuousMode ? "stop" : "all-inclusive"} 
+            name={isContinuousMode ? "stop" : "autorenew"} 
             size={18} 
             color={isContinuousMode ? colors.background : colors.primary} 
           />
@@ -737,7 +730,7 @@ export function VoiceChat({
             styles.continuousButtonText, 
             { color: isContinuousMode ? colors.background : colors.primary }
           ]}>
-            {isContinuousMode ? 'Stop' : 'Auto'}
+            {isContinuousMode ? 'Stop Auto' : 'Auto Chat'}
           </Text>
         </TouchableOpacity>
       )}
