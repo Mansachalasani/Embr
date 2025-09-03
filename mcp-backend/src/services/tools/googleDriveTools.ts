@@ -10,7 +10,7 @@ export const searchGoogleDriveToolDefinition: MCPTool = {
     try {
       const { 
         query = "", 
-        mimeType, 
+        fileType, // Renamed from mimeType for consistency
         maxResults = 20, 
         orderBy = "modifiedTime desc",
         includeContent = false 
@@ -19,18 +19,40 @@ export const searchGoogleDriveToolDefinition: MCPTool = {
       const auth = await GoogleAuthService.getAuthenticatedClient(userId);
       const drive = google.drive({ version: 'v3', auth });
 
-      // Build search query
-      let searchQuery = query;
-      if (mimeType) {
-        searchQuery += ` mimeType='${mimeType}'`;
+      // Build search query with proper formatting
+      let searchQuery = "trashed=false";
+      
+      // Add query term if provided and not empty
+      if (query && query.trim() !== "") {
+        searchQuery = `name contains '${query.trim()}' and ${searchQuery}`;
       }
       
-      // Add common filters
-      searchQuery += " and trashed=false";
+      // Add file type filter if provided
+      if (fileType) {
+        const mimeTypeMap: { [key: string]: string } = {
+          'pdf': 'application/pdf',
+          'document': 'application/vnd.google-apps.document',
+          'spreadsheet': 'application/vnd.google-apps.spreadsheet',
+          'presentation': 'application/vnd.google-apps.presentation',
+          'image': 'image/',
+          'video': 'video/',
+          'audio': 'audio/'
+        };
+        
+        const mimeType = mimeTypeMap[fileType.toLowerCase()] || fileType;
+        if (mimeType.endsWith('/')) {
+          searchQuery += ` and mimeType contains '${mimeType}'`;
+        } else {
+          searchQuery += ` and mimeType='${mimeType}'`;
+        }
+      }
+
+      // Validate and constrain maxResults (Google Drive API requires 1-1000)
+      const validMaxResults = Math.max(1, Math.min(maxResults, 100));
 
       const response = await drive.files.list({
         q: searchQuery,
-        pageSize: Math.min(maxResults, 100),
+        pageSize: validMaxResults,
         orderBy,
         fields: 'files(id,name,mimeType,size,createdTime,modifiedTime,webViewLink,thumbnailLink,description,parents)'
       });

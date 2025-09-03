@@ -173,6 +173,8 @@ export class AIService {
    * Call a specific MCP tool directly
    */
   static async callMCPTool(toolName: string, params: any = {}): Promise<any> {
+    console.log(`🔧 Calling MCP tool: ${toolName} with params:`, JSON.stringify(params, null, 2));
+    
     try {
       // Get the current session to include access token if needed
       const { data: { session } } = await supabase.auth.getSession();
@@ -185,18 +187,34 @@ export class AIService {
         headers['Authorization'] = `Bearer ${session.access_token}`;
       }
 
+      console.log(`🌐 Making request to: ${MCP_BASE_URL}/mcp/tools/${toolName}/execute`);
+      
       const response = await fetch(`${MCP_BASE_URL}/mcp/tools/${toolName}/execute`, {
         method: 'POST',
         headers,
         body: JSON.stringify(params),
       });
 
+      console.log(`📡 Response status: ${response.status} ${response.statusText}`);
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorText = await response.text();
+        console.error(`❌ HTTP Error response body:`, errorText);
+        
+        let errorData = {};
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText };
+        }
+        
         throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
-      return await response.json();
+      const responseData = await response.json();
+      console.log(`✅ MCP tool ${toolName} response:`, JSON.stringify(responseData, null, 2));
+      
+      return responseData;
     } catch (error) {
       console.error(`❌ Error calling MCP tool ${toolName}:`, error);
       return {

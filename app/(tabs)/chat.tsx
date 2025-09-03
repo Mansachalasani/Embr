@@ -27,6 +27,7 @@ import { VoiceChat } from '../../components/VoiceChat';
 import { FileOperationCard } from '../../components/FileOperationCard';
 import { DocumentAnalysisCard } from '../../components/DocumentAnalysisCard';
 import { DriveFileCard } from '../../components/DriveFileCard';
+import { DocumentCreationModal } from '../../components/DocumentCreationModal';
 import { useTheme } from '../../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -291,6 +292,25 @@ export default function Chat() {
       marginTop: 4,
       alignSelf: 'flex-end',
     },
+    fabContainer: {
+      position: 'absolute',
+      right: 16,
+      bottom: 100,
+      zIndex: 1000,
+    },
+    fab: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 8,
+    },
   });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -307,6 +327,7 @@ export default function Chat() {
     toolStatus?: string;
   } | null>(null);
   const [isVoiceModeEnabled, setIsVoiceModeEnabled] = useState(false);
+  const [showDocumentModal, setShowDocumentModal] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const messageCache = useRef<Map<string, ChatMessage[]>>(new Map());
 
@@ -795,7 +816,11 @@ export default function Chat() {
       return (
         <View style={[styles.messageContainer, styles.assistantMessage]}>
           <DriveFileCard
-            result={item.metadata.toolData}
+            result = {{
+              success: true,
+              data: item.metadata.toolData
+            }}
+            
             onOpenFile={(fileId) => {
               console.log('Open Drive file:', fileId);
               // TODO: Implement Drive file opening
@@ -1033,6 +1058,22 @@ export default function Chat() {
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
+
+        {/* Floating Action Button for Document Creation */}
+        <View style={styles.fabContainer}>
+          <TouchableOpacity
+            style={styles.fab}
+            onPress={() => setShowDocumentModal(true)}
+          >
+            <MaterialIcons name="add" size={28} color="#fff" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Document Creation Modal */}
+        <DocumentCreationModal
+          visible={showDocumentModal}
+          onClose={() => setShowDocumentModal(false)}
+        />
       </LinearGradient>
     </SafeAreaView>
   );

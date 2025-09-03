@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { DriveSearchResult } from '../types/chat';
+import { FileViewerService } from '../services/fileViewerService';
 
 interface DriveFileCardProps {
   result: DriveSearchResult;
@@ -19,6 +20,8 @@ export const DriveFileCard: React.FC<DriveFileCardProps> = ({
 }) => {
   const { colors } = useTheme();
 
+  // Add debugging
+  
   const styles = StyleSheet.create({
     card: {
       backgroundColor: colors.surface,
@@ -182,17 +185,39 @@ export const DriveFileCard: React.FC<DriveFileCardProps> = ({
     });
   };
 
-  const handleFileAction = (fileId: string, action: 'open' | 'download' | 'share') => {
-    switch (action) {
-      case 'open':
-        onOpenFile?.(fileId);
-        break;
-      case 'download':
-        onDownloadFile?.(fileId);
-        break;
-      case 'share':
-        onShareFile?.(fileId);
-        break;
+  const handleFileAction = async (file: any, action: 'open' | 'download' | 'share') => {
+    try {
+      switch (action) {
+        case 'open':
+          if (file.webViewLink) {
+            const success = await FileViewerService.openFile(file.webViewLink, file.name);
+            if (success) {
+              onOpenFile?.(file.id);
+            }
+          } else {
+            const success = await FileViewerService.openFile(file.id, file.name);
+            if (success) {
+              onOpenFile?.(file.id);
+            }
+          }
+          break;
+        case 'download':
+          // For download, we could implement downloading the file content
+          Alert.alert('Download', 'Download functionality will be implemented soon');
+          onDownloadFile?.(file.id);
+          break;
+        case 'share':
+          if (file.webViewLink) {
+            const success = await FileViewerService.shareFile(file.webViewLink, file.name);
+            if (success) {
+              onShareFile?.(file.id);
+            }
+          }
+          break;
+      }
+    } catch (error) {
+      console.error(`Failed to ${action} file:`, error);
+      Alert.alert('Error', `Failed to ${action} file`);
     }
   };
 
@@ -212,14 +237,14 @@ export const DriveFileCard: React.FC<DriveFileCardProps> = ({
             </Text>
           </View>
         </View>
-        <Text style={styles.errorText}>{result.error || 'Unknown error occurred'}</Text>
+        <Text style={styles.errorText}>{result.error|| 'Unknown error occurred'}</Text>
       </View>
     );
   }
 
   const { files, totalCount, query } = result.data!;
 
-  if (files.length === 0) {
+  if (files && files.length === 0) {
     return (
       <View style={styles.card}>
         <View style={styles.header}>
@@ -254,7 +279,7 @@ export const DriveFileCard: React.FC<DriveFileCardProps> = ({
       )}
 
       <View style={styles.filesList}>
-        {files.map((file) => (
+        {files && files.map((file) => (
           <View key={file.id} style={styles.fileItem}>
             <View style={styles.fileHeader}>
               <View style={styles.fileNameContainer}>
@@ -271,19 +296,19 @@ export const DriveFileCard: React.FC<DriveFileCardProps> = ({
               <View style={styles.fileActions}>
                 <TouchableOpacity
                   style={styles.actionButton}
-                  onPress={() => handleFileAction(file.id, 'open')}
+                  onPress={() => handleFileAction(file, 'open')}
                 >
                   <MaterialIcons name="open-in-new" size={14} color={colors.primary} />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.actionButton}
-                  onPress={() => handleFileAction(file.id, 'download')}
+                  onPress={() => handleFileAction(file, 'download')}
                 >
                   <MaterialIcons name="download" size={14} color={colors.primary} />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.actionButton}
-                  onPress={() => handleFileAction(file.id, 'share')}
+                  onPress={() => handleFileAction(file, 'share')}
                 >
                   <MaterialIcons name="share" size={14} color={colors.primary} />
                 </TouchableOpacity>
@@ -319,7 +344,7 @@ export const DriveFileCard: React.FC<DriveFileCardProps> = ({
         ))}
       </View>
 
-      {totalCount > files.length && (
+      { files && totalCount > files.length && (
         <Text style={styles.totalCount}>
           Showing {files.length} of {totalCount} files
         </Text>

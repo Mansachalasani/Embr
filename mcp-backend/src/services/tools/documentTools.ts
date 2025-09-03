@@ -433,7 +433,7 @@ async function extractDocumentMetadata(content: string) {
 async function summarizeWithAI(content: string, length: string, apiKey: string): Promise<string> {
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const lengthInstruction = {
       short: "in 2-3 sentences",
@@ -458,7 +458,7 @@ async function generateContentWithAI(
   options?: any
 ): Promise<string> {
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   const lengthMap = {
     short: "200-400 words",
@@ -483,7 +483,7 @@ Please provide well-structured, coherent content that matches the specified styl
 
 async function analyzeSentimentWithAI(content: string, apiKey: string): Promise<any> {
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   const prompt = `Analyze the sentiment of the following text and provide:
   1. Overall sentiment (positive, negative, neutral)

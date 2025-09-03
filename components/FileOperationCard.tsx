@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { FileOperationResult } from '../types/chat';
+import { FileViewerService } from '../services/fileViewerService';
 
 interface FileOperationCardProps {
   result: FileOperationResult;
@@ -145,16 +146,27 @@ export const FileOperationCard: React.FC<FileOperationCardProps> = ({
     return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
   };
 
-  const handleFileAction = (action: 'open' | 'share') => {
+  const handleFileAction = async (action: 'open' | 'share') => {
     if (!result.data?.filePath) {
       Alert.alert('Error', 'No file path available');
       return;
     }
 
-    if (action === 'open' && onOpenFile) {
-      onOpenFile(result.data.filePath);
-    } else if (action === 'share' && onShareFile) {
-      onShareFile(result.data.filePath);
+    try {
+      if (action === 'open') {
+        const success = await FileViewerService.openFile(result.data.filePath, result.data.fileName);
+        if (success && onOpenFile) {
+          onOpenFile(result.data.filePath);
+        }
+      } else if (action === 'share') {
+        const success = await FileViewerService.shareFile(result.data.filePath, result.data.fileName);
+        if (success && onShareFile) {
+          onShareFile(result.data.filePath);
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to ${action} file:`, error);
+      Alert.alert('Error', `Failed to ${action} file`);
     }
   };
 

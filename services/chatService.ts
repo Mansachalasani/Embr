@@ -756,7 +756,36 @@ export class ChatService {
   }
 
   private static processDriveSearchResponse(result: any): ChatMessage {
+    console.log('🔍 Processing Drive search response:', JSON.stringify(result, null, 2));
+    
+    // Check if result has the expected structure
+    if (!result?.data) {
+      console.error('❌ Drive search result missing data field:', result);
+      return this.createMessage(
+        'assistant',
+        '❌ **Google Drive Error:** Invalid response format',
+        { 
+          error: true, 
+          toolName: 'searchGoogleDrive', 
+          toolData: { success: false, error: 'Invalid response format' }
+        }
+      );
+    }
+
     const { files, totalCount, query } = result.data;
+    
+    if (!Array.isArray(files)) {
+      console.error('❌ Drive search result files is not an array:', files);
+      return this.createMessage(
+        'assistant',
+        '❌ **Google Drive Error:** Invalid files data',
+        { 
+          error: true, 
+          toolName: 'searchGoogleDrive', 
+          toolData: { success: false, error: 'Invalid files data' }
+        }
+      );
+    }
     
     // Create a DriveSearchResult for the card
     const driveResult = {
@@ -767,6 +796,8 @@ export class ChatService {
         query
       }
     };
+
+    console.log('✅ Created driveResult:', JSON.stringify(driveResult, null, 2));
 
     return this.createMessage(
       'assistant',
