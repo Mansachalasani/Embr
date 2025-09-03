@@ -328,6 +328,7 @@ export const signInWithGoogle = async () => {
           "https://www.googleapis.com/auth/calendar",
           "https://www.googleapis.com/auth/userinfo.email",
           "https://www.googleapis.com/auth/userinfo.profile",
+          "https://www.googleapis.com/auth/drive", 
         ].join(" "),
         queryParams: {
           access_type: "offline", // 🔑 ensures refresh_token

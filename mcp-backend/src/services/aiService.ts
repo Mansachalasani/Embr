@@ -146,7 +146,7 @@ export class AIService {
       }
     }
 
-const prompt=`You are an intelligent assistant that decides whether to use a tool or directly answer with Gemini.
+const prompt=`You are an intelligent assistant with advanced capabilities including file management, document processing, Google Drive integration, and productivity tools.
 
 Available Tools:
 ${this.formatToolsForPrompt(availableTools)}
@@ -159,9 +159,10 @@ Your task:
 2. If a tool is best, pick the correct one and extract the required parameters.
 3. For real-time data (weather, news, stock prices, movie times, etc.) ALWAYS use searchWeb first.
 4. If the user mentions or asks about a specific website/URL, use crawlPage to get current content.
-5. If no tool matches but Gemini can generate a useful answer, provide that as "geminiOutput".
-6. Always classify the response into a category (e.g., "calendar", "email", "weather", "search", "general").
-7. Indicate if Gemini's output can safely be shown to the user with a boolean flag.
+5. For file operations, document processing, or Google Drive actions, use the appropriate tools.
+6. If no tool matches but Gemini can generate a useful answer, provide that as "geminiOutput".
+7. Always classify the response into a category.
+8. Indicate if Gemini's output can safely be shown to the user with a boolean flag.
 
 Respond in **valid JSON**:
 {
@@ -170,13 +171,18 @@ Respond in **valid JSON**:
   "parameters": { "only include parameters explicitly mentioned by user" },
   "reasoning": "why this choice was made",
   "geminiOutput": "text or null",
-  "category": "general | weather | email | calendar | search | ...",
+  "category": "general | calendar | email | files | documents | drive | search | analysis | creation",
   "canUseGemini": true/false
 }
 
 Guidelines:
 - Use conversation history to understand context and follow-up questions.
-- Use a tool when the user explicitly asks for actions related to the tool's functionality.
+- File System Tools: Use readFile, writeFile, listDirectory for local file operations
+- Google Drive Tools: Use searchGoogleDrive, getGoogleDriveFile, createGoogleDriveFile for Drive operations
+- Document Processing: Use processDocument for analysis, summarization, keyword extraction
+- Document Creation: Use createDocument or generateContentWithAI for content generation
+- Calendar/Email: Use existing tools for productivity tasks
+- Always prefer specific tools over generic responses when user requests actionable tasks
 - Calendar queries: use getTodaysEvents for "today", "this morning", "afternoon", "meetings"
 - Email queries: use getEmails for "emails", "messages", "inbox", "mail" - supports advanced search, date filtering, labels, attachments
 - For email queries, leverage Gmail search syntax (from:, subject:, is:unread, has:attachment, after:, before:, etc.)

@@ -210,7 +210,7 @@ export class ChatService {
           if (connectStatusResult.success && connectStatusResult.data.googleWorkspace.connected) {
             responses.push(this.createMessage(
               'assistant',
-              `🔗 **Google Workspace Connection**\n\n✅ Already connected and ready!\n\nYou can use \`/calendar\` and \`/emails\` commands.`,
+              `🔗 **Google Workspace Connection**\n\n✅ Already connected and ready!\n\nYou can use \`/calendar\`, \`/emails\`, and \`/drive-search\` commands.`,
               { toolName: 'googleConnect' }
             ));
           } else {
@@ -221,8 +221,104 @@ export class ChatService {
             ));
           }
           break;
-          
+
         default:
+          // Check for parameterized commands
+          if (command.startsWith('/files')) {
+            const params = userMessage.slice(6).trim();
+            const dirPath = params || 'Documents';
+            responses.push(this.createMessage('system', `Listing files in ${dirPath}...`, { loading: true }));
+            const fileResult = await this.handleFileCommand('listDirectory', { dirPath, includeDetails: true });
+            responses.push(fileResult);
+            break;
+          }
+          
+          if (command.startsWith('/read')) {
+            const filePath = userMessage.slice(5).trim();
+            if (!filePath) {
+              responses.push(this.createMessage('assistant', 'Please specify a file path. Example: /read Documents/myfile.txt', { error: true }));
+              break;
+            }
+            responses.push(this.createMessage('system', `Reading file: ${filePath}...`, { loading: true }));
+            const readResult = await this.handleFileCommand('readFile', { filePath });
+            responses.push(readResult);
+            break;
+          }
+          
+          if (command.startsWith('/drive-search')) {
+            const query = userMessage.slice(13).trim();
+            if (!query) {
+              responses.push(this.createMessage('assistant', 'Please specify search terms. Example: /drive-search project reports', { error: true }));
+              break;
+            }
+            responses.push(this.createMessage('system', `Searching Google Drive for: ${query}...`, { loading: true }));
+            const searchResult = await this.handleDriveCommand('searchGoogleDrive', { query, maxResults: 10, includeContent: false });
+            responses.push(searchResult);
+            break;
+          }
+          
+          if (command.startsWith('/drive-get')) {
+            const fileId = userMessage.slice(10).trim();
+            if (!fileId) {
+              responses.push(this.createMessage('assistant', 'Please specify a Google Drive file ID. Example: /drive-get 1ABC...XYZ', { error: true }));
+              break;
+            }
+            responses.push(this.createMessage('system', `Getting Google Drive file...`, { loading: true }));
+            const getResult = await this.handleDriveCommand('getGoogleDriveFile', { fileId, includeMetadata: true });
+            responses.push(getResult);
+            break;
+          }
+          
+          if (command.startsWith('/analyze')) {
+            const filePath = userMessage.slice(8).trim();
+            if (!filePath) {
+              responses.push(this.createMessage('assistant', 'Please specify a file path. Example: /analyze Documents/report.pdf', { error: true }));
+              break;
+            }
+            responses.push(this.createMessage('system', `Analyzing document: ${filePath}...`, { loading: true }));
+            const analyzeResult = await this.handleDocumentCommand('processDocument', {
+              input: { type: 'file_path', value: filePath },
+              operations: ['extract_text', 'summarize', 'extract_keywords', 'analyze_sentiment']
+            });
+            responses.push(analyzeResult);
+            break;
+          }
+          
+          if (command.startsWith('/create-doc')) {
+            const params = userMessage.slice(11).trim().split(' ');
+            const title = params[0]?.replace(/"/g, '') || 'Untitled Document';
+            const style = params[1] || 'formal';
+            responses.push(this.createMessage('system', `Creating document: ${title}...`, { loading: true }));
+            const createResult = await this.handleDocumentCommand('createDocument', {
+              type: 'text',
+              title,
+              destination: { type: 'local_file', path: 'Documents' },
+              aiGeneration: {
+                enabled: true,
+                prompt: `Create a ${title}`,
+                style
+              }
+            });
+            responses.push(createResult);
+            break;
+          }
+          
+          if (command.startsWith('/generate')) {
+            const prompt = userMessage.slice(9).trim().replace(/"/g, '');
+            if (!prompt) {
+              responses.push(this.createMessage('assistant', 'Please specify what to generate. Example: /generate "Blog post about AI trends"', { error: true }));
+              break;
+            }
+            responses.push(this.createMessage('system', `Generating content...`, { loading: true }));
+            const generateResult = await this.handleDocumentCommand('generateContentWithAI', {
+              prompt,
+              contentType: 'article',
+              style: 'formal',
+              length: 'medium'
+            });
+            responses.push(generateResult);
+            break;
+          }
           responses.push(this.createMessage(
             'assistant', 
             `Unknown command: ${command}. Type /help to see available commands.`,
@@ -480,6 +576,334 @@ export class ChatService {
       'assistant',
       response,
       { toolName: 'status', toolData: result.data }
+    );
+  }
+
+  // New handler methods for file and document operations
+  private static async handleFileCommand(toolName: string, params: any): Promise<ChatMessage> {
+    try {
+      const result = await AIService.callMCPTool(toolName, params);
+      
+      if (!result.success) {
+        return this.createMessage(
+          'assistant',
+          `❌ **File Operation Error:** ${result.error}`,
+          { error: true, toolName, toolData: result }
+        );
+      }
+
+      switch (toolName) {
+        case 'readFile':
+          return this.processFileReadResponse(result);
+        case 'listDirectory':
+          return this.processDirectoryListResponse(result);
+        case 'writeFile':
+          return this.processFileWriteResponse(result);
+        default:
+          return this.createMessage('assistant', JSON.stringify(result.data, null, 2), { toolName });
+      }
+    } catch (error) {
+      return this.createMessage(
+        'assistant',
+        `❌ **File operation failed:** ${error instanceof Error ? error.message : 'Unknown error'}`,
+        { error: true, toolName }
+      );
+    }
+  }
+
+  private static async handleDriveCommand(toolName: string, params: any): Promise<ChatMessage> {
+    try {
+      const result = await AIService.callMCPTool(toolName, params);
+      
+      if (!result.success) {
+        return this.createMessage(
+          'assistant',
+          `❌ **Google Drive Error:** ${result.error}`,
+          { error: true, toolName, toolData: result }
+        );
+      }
+
+      switch (toolName) {
+        case 'searchGoogleDrive':
+          return this.processDriveSearchResponse(result);
+        case 'getGoogleDriveFile':
+          return this.processDriveFileResponse(result);
+        case 'createGoogleDriveFile':
+          return this.processDriveCreateResponse(result);
+        default:
+          return this.createMessage('assistant', JSON.stringify(result.data, null, 2), { toolName });
+      }
+    } catch (error) {
+      return this.createMessage(
+        'assistant',
+        `❌ **Google Drive operation failed:** ${error instanceof Error ? error.message : 'Unknown error'}`,
+        { error: true, toolName }
+      );
+    }
+  }
+
+  private static async handleDocumentCommand(toolName: string, params: any): Promise<ChatMessage> {
+    try {
+      const result = await AIService.callMCPTool(toolName, params);
+      
+      if (!result.success) {
+        return this.createMessage(
+          'assistant',
+          `❌ **Document Error:** ${result.error}`,
+          { error: true, toolName, toolData: result }
+        );
+      }
+
+      switch (toolName) {
+        case 'processDocument':
+          return this.processDocumentAnalysisResponse(result);
+        case 'createDocument':
+          return this.processDocumentCreateResponse(result);
+        case 'generateContentWithAI':
+          return this.processContentGenerationResponse(result);
+        default:
+          return this.createMessage('assistant', JSON.stringify(result.data, null, 2), { toolName });
+      }
+    } catch (error) {
+      return this.createMessage(
+        'assistant',
+        `❌ **Document operation failed:** ${error instanceof Error ? error.message : 'Unknown error'}`,
+        { error: true, toolName }
+      );
+    }
+  }
+
+  // Response processors for new tools
+  private static processFileReadResponse(result: any): ChatMessage {
+    const { content, filePath, size, wordCount } = result.data;
+    
+    // Create a FileOperationResult for the card
+    const fileResult = {
+      success: true,
+      data: {
+        content,
+        filePath,
+        fileName: filePath.split('/').pop(),
+        size,
+        wordCount
+      }
+    };
+
+    return this.createMessage(
+      'file',
+      `File successfully read: ${filePath}`,
+      { 
+        toolName: 'readFile', 
+        toolData: fileResult,
+        fileType: 'local',
+        fileName: filePath.split('/').pop(),
+        filePath,
+        fileSize: size,
+        wordCount
+      }
+    );
+  }
+
+  private static processDirectoryListResponse(result: any): ChatMessage {
+    const { directory, items, totalCount } = result.data;
+    
+    let response = `📁 **Directory: ${directory}**\n\n`;
+    response += `**Found ${totalCount} items:**\n\n`;
+
+    items.slice(0, 20).forEach((item: any) => {
+      const icon = item.type === 'directory' ? '📁' : '📄';
+      const sizeInfo = item.size ? ` (${Math.round(item.size / 1024)}KB)` : '';
+      response += `${icon} **${item.name}**${sizeInfo}\n`;
+    });
+
+    if (items.length > 20) {
+      response += `\n... and ${items.length - 20} more items`;
+    }
+
+    return this.createMessage(
+      'assistant',
+      response,
+      { toolName: 'listDirectory', toolData: result.data }
+    );
+  }
+
+  private static processFileWriteResponse(result: any): ChatMessage {
+    const { filePath, size, contentLength } = result.data;
+    
+    // Create a FileOperationResult for the card
+    const fileResult = {
+      success: true,
+      data: {
+        filePath,
+        fileName: filePath.split('/').pop(),
+        size,
+        metadata: { contentLength }
+      }
+    };
+
+    return this.createMessage(
+      'file',
+      `File successfully written: ${filePath}`,
+      { 
+        toolName: 'writeFile', 
+        toolData: fileResult,
+        fileType: 'local',
+        fileName: filePath.split('/').pop(),
+        filePath,
+        fileSize: size
+      }
+    );
+  }
+
+  private static processDriveSearchResponse(result: any): ChatMessage {
+    const { files, totalCount, query } = result.data;
+    
+    // Create a DriveSearchResult for the card
+    const driveResult = {
+      success: true,
+      data: {
+        files,
+        totalCount,
+        query
+      }
+    };
+
+    return this.createMessage(
+      'assistant',
+      `Found ${totalCount} files in Google Drive`,
+      { 
+        toolName: 'searchGoogleDrive', 
+        toolData: driveResult,
+        fileType: 'drive'
+      }
+    );
+  }
+
+  private static processDriveFileResponse(result: any): ChatMessage {
+    const { id, name, content, contentType, wordCount, metadata } = result.data;
+    
+    let response = `☁️ **Google Drive File**\n\n`;
+    response += `**Name:** ${name}\n`;
+    response += `**Type:** ${contentType}\n`;
+    if (wordCount) response += `**Words:** ${wordCount}\n`;
+    if (metadata?.size) response += `**Size:** ${Math.round(metadata.size / 1024)}KB\n`;
+    response += `\n**Content:**\n\`\`\`\n${content.slice(0, 1000)}${content.length > 1000 ? '\n... (truncated)' : ''}\n\`\`\``;
+
+    return this.createMessage(
+      'assistant',
+      response,
+      { 
+        toolName: 'getGoogleDriveFile', 
+        toolData: result.data,
+        fileType: 'drive',
+        fileName: name,
+        wordCount
+      }
+    );
+  }
+
+  private static processDriveCreateResponse(result: any): ChatMessage {
+    const { id, name, webViewLink, wordCount, size } = result.data;
+    
+    let response = `✅ **Google Drive File Created**\n\n`;
+    response += `**Name:** ${name}\n`;
+    if (wordCount) response += `**Words:** ${wordCount}\n`;
+    if (size) response += `**Size:** ${Math.round(size / 1024)}KB\n`;
+    response += `🔗 [Open in Drive](${webViewLink})\n`;
+    response += `🆔 ID: \`${id}\``;
+
+    return this.createMessage(
+      'assistant',
+      response,
+      { toolName: 'createGoogleDriveFile', toolData: result.data }
+    );
+  }
+
+  private static processDocumentAnalysisResponse(result: any): ChatMessage {
+    const { operations, statistics } = result.data;
+    
+    // Create a DocumentAnalysisResult for the card
+    const documentResult = {
+      success: true,
+      data: {
+        operations,
+        statistics
+      }
+    };
+
+    return this.createMessage(
+      'document',
+      'Document analysis completed',
+      { 
+        toolName: 'processDocument', 
+        toolData: documentResult,
+        operations: Object.keys(operations),
+        wordCount: statistics?.wordCount,
+        documentType: 'text'
+      }
+    );
+  }
+
+  private static processDocumentCreateResponse(result: any): ChatMessage {
+    const { title, type, contentLength, wordCount, destination, statistics } = result.data;
+    
+    let response = `📄 **Document Created**\n\n`;
+    response += `**Title:** ${title}\n`;
+    response += `**Type:** ${type}\n`;
+    response += `**Length:** ${contentLength} characters\n`;
+    if (wordCount) response += `**Words:** ${wordCount}\n`;
+    if (statistics?.estimatedReadingTime) {
+      response += `**Reading time:** ${statistics.estimatedReadingTime} minutes\n`;
+    }
+    
+    if (destination.type === 'local_file') {
+      response += `**Saved to:** ${destination.path}\n`;
+    } else if (destination.type === 'google_drive') {
+      response += `**Uploaded to:** Google Drive\n`;
+      if (destination.webViewLink) {
+        response += `🔗 [Open in Drive](${destination.webViewLink})`;
+      }
+    }
+
+    return this.createMessage(
+      'assistant',
+      response,
+      { 
+        toolName: 'createDocument', 
+        toolData: result.data,
+        documentType: type,
+        wordCount
+      }
+    );
+  }
+
+  private static processContentGenerationResponse(result: any): ChatMessage {
+    const { content, metadata } = result.data;
+    
+    let response = `✨ **Generated Content**\n\n`;
+    if (metadata) {
+      response += `**Type:** ${metadata.contentType}\n`;
+      response += `**Style:** ${metadata.style}\n`;
+      response += `**Words:** ${metadata.wordCount}\n`;
+      if (metadata.estimatedReadingTime) {
+        response += `**Reading time:** ${metadata.estimatedReadingTime}\n`;
+      }
+      if (metadata.keywords && metadata.keywords.length > 0) {
+        response += `**Keywords:** ${metadata.keywords.join(', ')}\n`;
+      }
+      response += `\n`;
+    }
+    
+    response += `**Content:**\n${content}`;
+
+    return this.createMessage(
+      'assistant',
+      response,
+      { 
+        toolName: 'generateContentWithAI', 
+        toolData: result.data,
+        wordCount: metadata?.wordCount
+      }
     );
   }
 }

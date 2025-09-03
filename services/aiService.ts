@@ -168,4 +168,42 @@ export class AIService {
       return false;
     }
   }
+
+  /**
+   * Call a specific MCP tool directly
+   */
+  static async callMCPTool(toolName: string, params: any = {}): Promise<any> {
+    try {
+      // Get the current session to include access token if needed
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const response = await fetch(`${MCP_BASE_URL}/mcp/tools/${toolName}/execute`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(params),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`❌ Error calling MCP tool ${toolName}:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Tool execution failed',
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
 }

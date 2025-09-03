@@ -6,6 +6,21 @@ import { getLastTenMailsToolDefinition } from './tools/getLastTenMails';
 import { createCalendarEventToolDefinition } from './tools/createCalendarEvent';
 import { crawlPageToolDefinition } from './tools/crawlPage';
 import { searchWebToolDefinition } from './tools/searchWeb';
+import { 
+  readFileToolDefinition, 
+  writeFileToolDefinition, 
+  listDirectoryToolDefinition 
+} from './tools/fileSystemTools';
+import { 
+  searchGoogleDriveToolDefinition, 
+  getGoogleDriveFileToolDefinition, 
+  createGoogleDriveFileToolDefinition 
+} from './tools/googleDriveTools';
+import { 
+  processDocumentToolDefinition, 
+  createDocumentToolDefinition, 
+  generateContentWithAIToolDefinition 
+} from './tools/documentTools';
 
 export class MCPToolRegistry {
   private static instance: MCPToolRegistry;
@@ -349,6 +364,329 @@ export class MCPToolRegistry {
       ],
       timeContext: 'current',
       dataAccess: 'read'
+    });
+
+    // Register File System Tools
+    this.registerToolWithMetadata('readFile', readFileToolDefinition, {
+      name: 'readFile',
+      description: 'Read content from a file in the local file system (Documents, Desktop, or Downloads folders only)',
+      category: 'files',
+      parameters: [
+        {
+          name: 'filePath',
+          type: 'string',
+          description: 'Absolute path to the file to read',
+          required: true,
+          examples: ['/Users/username/Documents/file.txt', '~/Downloads/report.pdf']
+        }
+      ],
+      examples: [
+        {
+          query: "Read the contents of my report.txt file",
+          expectedParams: { filePath: "/Users/username/Documents/report.txt" },
+          description: "Read a specific text file"
+        },
+        {
+          query: "What's in my config file?",
+          expectedParams: { filePath: "/Users/username/Documents/config.json" },
+          description: "Read configuration or data files"
+        }
+      ],
+      timeContext: 'realtime',
+      dataAccess: 'read'
+    });
+
+    this.registerToolWithMetadata('writeFile', writeFileToolDefinition, {
+      name: 'writeFile',
+      description: 'Write content to a file in the local file system with security restrictions',
+      category: 'files',
+      parameters: [
+        {
+          name: 'filePath',
+          type: 'string',
+          description: 'Absolute path where to write the file',
+          required: true,
+          examples: ['/Users/username/Documents/newfile.txt']
+        },
+        {
+          name: 'content',
+          type: 'string',
+          description: 'Content to write to the file',
+          required: true,
+          examples: ['Hello, World!', '{"key": "value"}']
+        }
+      ],
+      examples: [
+        {
+          query: "Save this text to a file called notes.txt",
+          expectedParams: { filePath: "/Users/username/Documents/notes.txt", content: "Meeting notes..." },
+          description: "Create a new text file with content"
+        }
+      ],
+      timeContext: 'realtime',
+      dataAccess: 'write'
+    });
+
+    this.registerToolWithMetadata('listDirectory', listDirectoryToolDefinition, {
+      name: 'listDirectory',
+      description: 'List files and directories in a specified path with security restrictions',
+      category: 'files',
+      parameters: [
+        {
+          name: 'dirPath',
+          type: 'string',
+          description: 'Directory path to list (defaults to Documents)',
+          required: false,
+          examples: ['Documents', 'Downloads', 'Desktop']
+        },
+        {
+          name: 'includeDetails',
+          type: 'boolean',
+          description: 'Include file size, modification date, and type information',
+          required: false,
+          examples: [true, false]
+        }
+      ],
+      examples: [
+        {
+          query: "What files are in my Documents folder?",
+          expectedParams: { dirPath: "Documents", includeDetails: true },
+          description: "List files with details"
+        },
+        {
+          query: "Show me my downloads",
+          expectedParams: { dirPath: "Downloads" },
+          description: "List downloaded files"
+        }
+      ],
+      timeContext: 'realtime',
+      dataAccess: 'read'
+    });
+
+    // Register Google Drive Tools
+    this.registerToolWithMetadata('searchGoogleDrive', searchGoogleDriveToolDefinition, {
+      name: 'searchGoogleDrive',
+      description: 'Search for files in Google Drive using various criteria like name, content, file type, and date ranges',
+      category: 'drive',
+      parameters: [
+        {
+          name: 'query',
+          type: 'string',
+          description: 'Search query for finding files',
+          required: true,
+          examples: ['project reports', 'meeting notes 2024', 'budget spreadsheet']
+        },
+        {
+          name: 'fileType',
+          type: 'string',
+          description: 'Filter by specific file type',
+          required: false,
+          examples: ['document', 'spreadsheet', 'presentation', 'pdf']
+        },
+        {
+          name: 'maxResults',
+          type: 'number',
+          description: 'Maximum number of results to return',
+          required: false,
+          examples: [10, 25, 50]
+        }
+      ],
+      examples: [
+        {
+          query: "Find my project reports in Google Drive",
+          expectedParams: { query: "project reports", maxResults: 10 },
+          description: "Search for project-related documents"
+        },
+        {
+          query: "Show me recent spreadsheets",
+          expectedParams: { query: "spreadsheet", fileType: "spreadsheet", maxResults: 15 },
+          description: "Find spreadsheet files"
+        }
+      ],
+      timeContext: 'realtime',
+      dataAccess: 'read'
+    });
+
+    this.registerToolWithMetadata('getGoogleDriveFile', getGoogleDriveFileToolDefinition, {
+      name: 'getGoogleDriveFile',
+      description: 'Retrieve and read content from a specific Google Drive file by ID',
+      category: 'drive',
+      parameters: [
+        {
+          name: 'fileId',
+          type: 'string',
+          description: 'Google Drive file ID',
+          required: true,
+          examples: ['1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms']
+        },
+        {
+          name: 'includeContent',
+          type: 'boolean',
+          description: 'Whether to include file content in response',
+          required: false,
+          examples: [true, false]
+        }
+      ],
+      examples: [
+        {
+          query: "Get the content of this Google Doc",
+          expectedParams: { fileId: "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms", includeContent: true },
+          description: "Read a specific Google Drive document"
+        }
+      ],
+      timeContext: 'realtime',
+      dataAccess: 'read'
+    });
+
+    this.registerToolWithMetadata('createGoogleDriveFile', createGoogleDriveFileToolDefinition, {
+      name: 'createGoogleDriveFile',
+      description: 'Create a new file in Google Drive with specified content and metadata',
+      category: 'drive',
+      parameters: [
+        {
+          name: 'name',
+          type: 'string',
+          description: 'Name of the file to create',
+          required: true,
+          examples: ['Meeting Notes.docx', 'Budget 2024.xlsx']
+        },
+        {
+          name: 'content',
+          type: 'string',
+          description: 'Content to write to the file',
+          required: true,
+          examples: ['Meeting agenda and notes', 'Quarterly budget data']
+        },
+        {
+          name: 'mimeType',
+          type: 'string',
+          description: 'MIME type of the file',
+          required: false,
+          examples: ['application/vnd.google-apps.document', 'text/plain']
+        }
+      ],
+      examples: [
+        {
+          query: "Create a new Google Doc with meeting notes",
+          expectedParams: { name: "Team Meeting Notes", content: "Meeting agenda...", mimeType: "application/vnd.google-apps.document" },
+          description: "Create a Google Docs document"
+        }
+      ],
+      timeContext: 'realtime',
+      dataAccess: 'write'
+    });
+
+    // Register Document Processing Tools
+    this.registerToolWithMetadata('processDocument', processDocumentToolDefinition, {
+      name: 'processDocument',
+      description: 'Process and analyze document content with AI-powered analysis including summarization, keyword extraction, and sentiment analysis',
+      category: 'documents',
+      parameters: [
+        {
+          name: 'filePath',
+          type: 'string',
+          description: 'Path to the document file to process',
+          required: true,
+          examples: ['/Users/username/Documents/report.pdf', '~/Downloads/article.txt']
+        },
+        {
+          name: 'operations',
+          type: 'array',
+          description: 'List of analysis operations to perform',
+          required: false,
+          examples: [['summarize', 'keywords'], ['sentiment', 'structure']]
+        }
+      ],
+      examples: [
+        {
+          query: "Analyze this document and give me a summary",
+          expectedParams: { filePath: "/Users/username/Documents/report.pdf", operations: ["summarize", "keywords"] },
+          description: "Analyze document content with AI"
+        },
+        {
+          query: "What's the sentiment of this article?",
+          expectedParams: { filePath: "/Users/username/Downloads/article.txt", operations: ["sentiment"] },
+          description: "Perform sentiment analysis on text"
+        }
+      ],
+      timeContext: 'realtime',
+      dataAccess: 'read'
+    });
+
+    this.registerToolWithMetadata('createDocument', createDocumentToolDefinition, {
+      name: 'createDocument',
+      description: 'Create a new document with AI assistance, supporting various formats and templates',
+      category: 'documents',
+      parameters: [
+        {
+          name: 'title',
+          type: 'string',
+          description: 'Title of the document to create',
+          required: true,
+          examples: ['Project Report', 'Meeting Summary', 'Research Paper']
+        },
+        {
+          name: 'type',
+          type: 'string',
+          description: 'Type/format of document to create',
+          required: true,
+          examples: ['report', 'summary', 'letter', 'memo']
+        },
+        {
+          name: 'prompt',
+          type: 'string',
+          description: 'Description or instructions for document content',
+          required: false,
+          examples: ['Write a technical report about...', 'Summarize the key findings from...']
+        }
+      ],
+      examples: [
+        {
+          query: "Create a project report document",
+          expectedParams: { title: "Q4 Project Report", type: "report", prompt: "Summarize project achievements and goals" },
+          description: "Generate a structured project report"
+        }
+      ],
+      timeContext: 'realtime',
+      dataAccess: 'write'
+    });
+
+    this.registerToolWithMetadata('generateContentWithAI', generateContentWithAIToolDefinition, {
+      name: 'generateContentWithAI',
+      description: 'Generate various types of content using AI based on prompts and specifications',
+      category: 'documents',
+      parameters: [
+        {
+          name: 'prompt',
+          type: 'string',
+          description: 'Detailed prompt describing the content to generate',
+          required: true,
+          examples: ['Write a blog post about AI trends', 'Create an email template for customer support']
+        },
+        {
+          name: 'contentType',
+          type: 'string',
+          description: 'Type of content to generate',
+          required: false,
+          examples: ['blog_post', 'email', 'article', 'summary']
+        },
+        {
+          name: 'length',
+          type: 'string',
+          description: 'Desired length of the content',
+          required: false,
+          examples: ['short', 'medium', 'long', '500 words']
+        }
+      ],
+      examples: [
+        {
+          query: "Write a blog post about the future of AI",
+          expectedParams: { prompt: "Write an engaging blog post about AI trends and future developments", contentType: "blog_post", length: "medium" },
+          description: "Generate blog content with AI"
+        }
+      ],
+      timeContext: 'realtime',
+      dataAccess: 'write'
     });
   }
 

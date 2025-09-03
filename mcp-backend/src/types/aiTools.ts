@@ -3,20 +3,20 @@ export interface AIToolParameter {
   type: 'string' | 'number' | 'boolean' | 'object' | 'array';
   description: string;
   required: boolean;
-  examples?: string[];
+  examples?: (string | number | boolean | string[] | number[])[];
 }
 
 export interface AIToolMetadata {
   name: string;
   description: string;
-  category: 'calendar' | 'email' | 'productivity' | 'system' | 'web' | 'external' | 'social' | 'custom' | 'search';
+  category: 'calendar' | 'email' | 'productivity' | 'system' | 'web' | 'external' | 'social' | 'custom' | 'search' | 'files' | 'drive' | 'documents';
   parameters: AIToolParameter[];
   examples: {
     query: string;
     expectedParams: Record<string, any>;
     description: string;
   }[];
-  timeContext?: 'current' | 'future' | 'past' | 'any' | 'recent';
+  timeContext?: 'current' | 'future' | 'past' | 'any' | 'recent' | 'realtime';
   dataAccess: 'read' | 'write' | 'both';
 }
 

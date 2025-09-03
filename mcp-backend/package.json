@@ -29,9 +29,11 @@
     "googleapis": "^157.0.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
+    "mammoth": "^1.7.0",
     "microsoft-cognitiveservices-speech-sdk": "^1.45.0",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
+    "pdf-parse": "^1.1.1",
     "undici": "^6.21.3"
   },
   "devDependencies": {

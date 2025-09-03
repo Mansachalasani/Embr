@@ -24,6 +24,9 @@ import { ThinkingAnimation } from '../../components/ThinkingAnimation';
 import { StreamingMessage } from '../../components/StreamingMessage';
 import { StreamingCallbacks } from '../../services/streamingService';
 import { VoiceChat } from '../../components/VoiceChat';
+import { FileOperationCard } from '../../components/FileOperationCard';
+import { DocumentAnalysisCard } from '../../components/DocumentAnalysisCard';
+import { DriveFileCard } from '../../components/DriveFileCard';
 import { useTheme } from '../../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -738,6 +741,83 @@ export default function Chat() {
     const isUser = item.type === 'user';
     const isSystem = item.type === 'system';
     const isTool = item.type === 'tool';
+    const isFile = item.type === 'file';
+    const isDocument = item.type === 'document';
+
+    // Handle specialized card types
+    if (isFile && item.metadata?.toolData) {
+      return (
+        <View style={[styles.messageContainer, styles.assistantMessage]}>
+          <FileOperationCard
+            result={item.metadata.toolData}
+            operation={item.metadata.toolName || 'File Operation'}
+            onOpenFile={(filePath) => {
+              console.log('Open file:', filePath);
+              // TODO: Implement file opening
+            }}
+            onShareFile={(filePath) => {
+              console.log('Share file:', filePath);
+              // TODO: Implement file sharing
+            }}
+          />
+          <Text style={styles.timestamp}>
+            {new Date(item.timestamp).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
+          </Text>
+        </View>
+      );
+    }
+
+    if (isDocument && item.metadata?.toolData) {
+      return (
+        <View style={[styles.messageContainer, styles.assistantMessage]}>
+          <DocumentAnalysisCard
+            result={item.metadata.toolData}
+            onViewFullDocument={() => {
+              console.log('View full document');
+              // TODO: Implement full document viewing
+            }}
+          />
+          <Text style={styles.timestamp}>
+            {new Date(item.timestamp).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
+          </Text>
+        </View>
+      );
+    }
+
+    // Handle Google Drive search results
+    if (item.metadata?.toolName?.includes('Drive') && item.metadata?.toolData) {
+      return (
+        <View style={[styles.messageContainer, styles.assistantMessage]}>
+          <DriveFileCard
+            result={item.metadata.toolData}
+            onOpenFile={(fileId) => {
+              console.log('Open Drive file:', fileId);
+              // TODO: Implement Drive file opening
+            }}
+            onDownloadFile={(fileId) => {
+              console.log('Download Drive file:', fileId);
+              // TODO: Implement Drive file download
+            }}
+            onShareFile={(fileId) => {
+              console.log('Share Drive file:', fileId);
+              // TODO: Implement Drive file sharing
+            }}
+          />
+          <Text style={styles.timestamp}>
+            {new Date(item.timestamp).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
+          </Text>
+        </View>
+      );
+    }
 
     return (
       <View style={[
