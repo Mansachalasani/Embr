@@ -36,7 +36,7 @@ app.use(helmet());
 // CORS configuration
 const corsOrigins = process.env.CORS_ORIGINS?.split(',').map(origin => origin.trim()) || [
   'http://localhost:3000', 
-  'http://localhost:8081', 
+  'http://localhost:8081/', 
   'http://localhost:19000',
   'exp://localhost:19000',
   'exp://127.0.0.1:19000',

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { router, useSegments } from 'expo-router';
+import { Platform } from 'react-native';
 
 interface AuthContextType {
   user: User | null;
@@ -21,15 +22,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     console.log('🔍 AuthContext: Initializing...');
     
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      console.log('🔍 AuthContext: Initial session check');
-      console.log('Session:', session ? `✅ Found (${session.user?.email})` : '❌ None');
-      console.log('Error:', error);
-      
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    const initializeAuth = async () => {
+      try {
+        // For web, first check if there's a session in the URL
+        if (Platform.OS === 'web') {
+          const { data, error } = await supabase.auth.getSessionFromUrl();
+          if (error) {
+            console.log('🔍 AuthContext: Error getting session from URL:', error);
+          } else if (data?.session) {
+            console.log('🔍 AuthContext: Session found in URL');
+            setSession(data.session);
+            setUser(data.session.user);
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Fallback to regular session check
+        const { data: { session }, error } = await supabase.auth.getSession();
+        console.log('🔍 AuthContext: Initial session check');
+        console.log('Session:', session ? `✅ Found (${session.user?.email})` : '❌ None');
+        console.log('Error:', error);
+        
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      } catch (error) {
+        console.error('🔍 AuthContext: Error during initialization:', error);
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
 
     const {
       data: { subscription },

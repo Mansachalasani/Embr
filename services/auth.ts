@@ -2,15 +2,18 @@ import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import * as Crypto from 'expo-crypto';
 import { supabase } from '../lib/supabase';
+import { Platform } from 'react-native';
 
 WebBrowser.maybeCompleteAuthSession();
 
 export const signInWithGoogle = async () => {
   try {
-    const redirectUrl = AuthSession.makeRedirectUri({
-      scheme: 'supabaseauthapp', // Use your app's scheme from app.json
-      path: 'auth/callback',
-    });
+    const redirectUrl = Platform.OS === 'web' 
+      ? `${window.location.origin}/auth/callback`
+      : AuthSession.makeRedirectUri({
+          scheme: 'embr', // Use your app's scheme from app.json
+          path: 'auth/callback',
+        });
 
     console.log('Redirect URL:', redirectUrl);
 
