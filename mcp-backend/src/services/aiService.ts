@@ -139,7 +139,13 @@ export class AIService {
         const contextData = await SessionService.getConversationContext(context.sessionId, userId, 5);
         if (contextData.messages.length > 0) {
           conversationContext = '\n\nConversation History (last 5 messages):\n' + 
-            contextData.messages.map(msg => `${msg.role}: ${msg.content}`).join('\n');
+            contextData.messages.map((msg, index) => `${msg.role}: ${msg.content}`).join('\n');
+          
+          // Add tool usage context if available
+          if (contextData.tool_calls.length > 0) {
+            conversationContext += '\n\nRecent Tool Usage:\n' +
+              contextData.tool_calls.map((call: any) => `- Used ${call.tool_name} ${call.created_at ? new Date(call.created_at).toLocaleTimeString() : ''}`).join('\n');
+          }
         }
       } catch (error) {
         console.warn('⚠️ Could not fetch conversation context:', error);
@@ -176,21 +182,24 @@ Respond in **valid JSON**:
 }
 
 Guidelines:
-- Use conversation history to understand context and follow-up questions.
-- File System Tools: Use readFile, writeFile, listDirectory for local file operations
-- Google Drive Tools: Use searchGoogleDrive, getGoogleDriveFile, createGoogleDriveFile for Drive operations
-- Document Processing: Use processDocument for analysis, summarization, keyword extraction
-- Document Creation: Use createDocument or generateContentWithAI for content generation
-- Calendar/Email: Use existing tools for productivity tasks
-- Always prefer specific tools over generic responses when user requests actionable tasks
-- Calendar queries: use getTodaysEvents for "today", "this morning", "afternoon", "meetings"
-- Email queries: use getEmails for "emails", "messages", "inbox", "mail" - supports advanced search, date filtering, labels, attachments
-- For email queries, leverage Gmail search syntax (from:, subject:, is:unread, has:attachment, after:, before:, etc.)
-- **Real-time data queries**: Use searchWeb for weather, news, stock prices, movie showtimes, restaurant info, traffic, sports scores, etc.
-- **URL/Website queries**: Use crawlPage when user provides a URL or asks about specific website content
-- **Current events**: Use searchWeb for "latest", "recent", "today's", "breaking news", etc.
-- Consider previous messages when interpreting pronouns and references (e.g., "what about tomorrow?" after discussing today's calendar).
-- If unclear, return "tool": null and "geminiOutput": null.
+- **Context Awareness**: Use conversation history to understand follow-up questions, pronouns ("it", "that", "those"), and references ("the email", "my files", "that document").
+- **Follow-up Handling**: 
+  * "Create a doc from it" after retrieving emails → use createDocument with email data
+  * "Summarize it" after finding files → use processDocument or generate summary
+  * "Save it to drive" after generating content → use createGoogleDriveFile
+  * "Tell me more about that" after search results → use crawlPage on relevant URLs
+  * "What about tomorrow?" after today's calendar → use getTodaysEvents with tomorrow's date
+- **Tool Selection**:
+  * File System Tools: readFile, writeFile, listDirectory for local operations
+  * Google Drive Tools: searchGoogleDrive, getGoogleDriveFile, createGoogleDriveFile for Drive operations
+  * Document Tools: processDocument for analysis, createDocument/generateContentWithAI for creation
+  * Calendar/Email: getTodaysEvents, getEmails with advanced Gmail search syntax
+  * Web Tools: searchWeb for real-time data, crawlPage for specific URLs
+- **Chaining Recognition**: Recognize when user wants multiple operations (e.g., "get my emails and create a summary document")
+- **Reference Resolution**: When user says "that file", "the document", "my emails", look at recent context to identify what they're referring to
+- **Time References**: "today", "tomorrow", "this week", "yesterday" - calculate appropriate dates based on timestamp
+- **Pronoun Mapping**: "it" usually refers to the most recently mentioned item in conversation history
+- If context is insufficient or unclear, ask for clarification through geminiOutput rather than guessing
 `
 
     try {
@@ -306,8 +315,12 @@ Instructions:
 - Write in a friendly, conversational tone
 - Use conversation history to maintain context and continuity
 - Focus on what the user asked for specifically
+- **Handle chained operations**: If multiple tools were used, explain what was done in sequence
+- **Document creation**: If a document was created, mention where it was saved (locally/Drive) and provide any access links
+- **Tool chaining**: When tools were chained, explain the workflow (e.g., "I retrieved your emails and created a summary document")
 - If it's calendar data, mention times and key details
 - If it's email data, summarize key messages
+- If it's file/drive data, mention file types, sizes, and locations
 - Keep it concise but informative
 - ${context.preferences?.isVoiceMode ? 'NO emojis, markdown, or special formatting - plain text only for speech synthesis' : 'Use emojis sparingly and appropriately'}
 - If the data is empty or minimal, acknowledge that naturally
@@ -317,6 +330,8 @@ Instructions:
 Examples:
 - For calendar: "You have 3 meetings today. Your next one is the team standup at 10 AM."
 - For email: "You have 5 new emails. The most recent is from John about the project deadline."
+- For chained operations: "I retrieved your emails and created a summary document in your Google Drive. The document contains 10 emails from today."
+- For document creation: "I've created a document called 'Meeting Notes' and saved it both locally and to your Google Drive."
 
 Generate a natural response:
 `;
@@ -357,17 +372,38 @@ Generate a natural response:
   private shouldChainTool(selection: AIToolSelection, toolResult: any, context: UserContext): boolean {
     if (!toolResult.success || !toolResult.data) return false;
     
-    // If we used searchWeb and got URLs that might be relevant, consider crawling them
+    const query = context.query.toLowerCase();
+    
+    // 1. If we used searchWeb and got URLs that might be relevant, consider crawling them
     if (selection.tool === 'searchWeb' && toolResult.data.results) {
       const results = toolResult.data.results;
       // Check if query suggests user wants detailed content analysis
-      const wantsSummary = context.query.toLowerCase().includes('summarize') ||
-                          context.query.toLowerCase().includes('analyze') ||
-                          context.query.toLowerCase().includes('what does') ||
-                          context.query.toLowerCase().includes('content of');
+      const wantsSummary = query.includes('summarize') ||
+                          query.includes('analyze') ||
+                          query.includes('what does') ||
+                          query.includes('content of');
       
       // If we have results and user wants detailed analysis, chain to crawlPage
       return wantsSummary && results.length > 0;
+    }
+    
+    // 2. If we retrieved emails/calendar/drive data and user wants to create a document
+    const dataRetrievalTools = ['getEmails', 'getLastTenMails', 'getTodaysEvents', 'searchGoogleDrive', 'getGoogleDriveFile'];
+    if (dataRetrievalTools.includes(selection.tool || '') && toolResult.data) {
+      const wantsDocument = query.includes('create') && (query.includes('doc') || query.includes('document') || query.includes('summary') || query.includes('report'));
+      return wantsDocument;
+    }
+    
+    // 3. If we generated content and user wants to save it
+    if (selection.tool === 'generateContentWithAI' && toolResult.data) {
+      const wantsToSave = query.includes('save') || query.includes('create doc') || query.includes('write to');
+      return wantsToSave;
+    }
+    
+    // 4. If we processed a document and user wants to create a summary
+    if (selection.tool === 'processDocument' && toolResult.data) {
+      const wantsSummaryDoc = query.includes('summarize') && (query.includes('create') || query.includes('save'));
+      return wantsSummaryDoc;
     }
     
     return false;
@@ -385,13 +421,14 @@ Generate a natural response:
     try {
       console.log('🔗 Performing tool chaining after:', firstSelection.tool);
       
+      const query = context.query.toLowerCase();
+      
+      // 1. SearchWeb -> CrawlPage chaining
       if (firstSelection.tool === 'searchWeb' && firstResult.data.results) {
-        // Get the most relevant URL from search results
         const topResult = firstResult.data.results[0];
         if (topResult && topResult.url) {
           console.log('🔗 Chaining to crawlPage for URL:', topResult.url);
           
-          // Use crawlPage to get detailed content
           const crawlTool = this.toolRegistry.getTool('crawlPage');
           if (crawlTool) {
             const crawlResult = await crawlTool.execute(userId, {
@@ -401,7 +438,6 @@ Generate a natural response:
             });
             
             if (crawlResult.success) {
-              // Combine search results with crawled content
               return {
                 success: true,
                 data: {
@@ -411,6 +447,134 @@ Generate a natural response:
                 }
               };
             }
+          }
+        }
+      }
+      
+      // 2. Data Retrieval -> Document Creation chaining
+      const dataRetrievalTools = ['getEmails', 'getLastTenMails', 'getTodaysEvents', 'searchGoogleDrive', 'getGoogleDriveFile'];
+      if (dataRetrievalTools.includes(firstSelection.tool || '') && firstResult.data) {
+        console.log('🔗 Chaining to createDocument after data retrieval');
+        
+        // Generate content based on the retrieved data
+        let content = '';
+        let title = '';
+        
+        if (firstSelection.tool?.includes('Email')) {
+          const emails = firstResult.data.emails || [];
+          title = `Email Summary - ${new Date().toLocaleDateString()}`;
+          content = `# Email Summary - ${new Date().toLocaleDateString()}\n\n`;
+          content += `**Total Emails:** ${emails.length}\n\n`;
+          
+          emails.forEach((email: any, index: number) => {
+            content += `## ${index + 1}. ${email.subject || 'No Subject'}\n`;
+            content += `**From:** ${email.sender || 'Unknown'}\n`;
+            content += `**Date:** ${email.date || 'Unknown'}\n`;
+            content += `**Summary:** ${email.snippet || email.content?.substring(0, 200) || 'No content'}...\n\n`;
+          });
+        } else if (firstSelection.tool === 'getTodaysEvents') {
+          const events = firstResult.data.events || [];
+          title = `Calendar Summary - ${new Date().toLocaleDateString()}`;
+          content = `# Calendar Summary - ${new Date().toLocaleDateString()}\n\n`;
+          content += `**Total Events:** ${events.length}\n\n`;
+          
+          events.forEach((event: any, index: number) => {
+            content += `## ${index + 1}. ${event.summary || 'No Title'}\n`;
+            content += `**Time:** ${event.start?.dateTime || event.start?.date || 'Unknown'}\n`;
+            if (event.description) content += `**Description:** ${event.description}\n`;
+            content += `\n`;
+          });
+        } else if (firstSelection.tool?.includes('Drive')) {
+          const files = firstResult.data.files || [firstResult.data];
+          title = `Drive Files Summary - ${new Date().toLocaleDateString()}`;
+          content = `# Google Drive Files Summary\n\n`;
+          
+          files.forEach((file: any, index: number) => {
+            content += `## ${index + 1}. ${file.name || file.title || 'Untitled'}\n`;
+            content += `**Type:** ${file.mimeType || file.type || 'Unknown'}\n`;
+            if (file.size) content += `**Size:** ${Math.round(file.size / 1024)} KB\n`;
+            if (file.content) content += `**Content Preview:** ${file.content.substring(0, 300)}...\n`;
+            content += `\n`;
+          });
+        }
+        
+        // Create the document
+        const createDocTool = this.toolRegistry.getTool('createDocument');
+        if (createDocTool && content) {
+          const docResult = await createDocTool.execute(userId, {
+            title,
+            content,
+            type: 'markdown',
+            destination: 'google_drive' // Save to Drive by default
+          });
+          
+          if (docResult.success) {
+            return {
+              success: true,
+              data: {
+                original_data: firstResult.data,
+                created_document: docResult.data,
+                chained_tools: [firstSelection.tool, 'createDocument']
+              }
+            };
+          }
+        }
+      }
+      
+      // 3. Generated Content -> Save Document chaining  
+      if (firstSelection.tool === 'generateContentWithAI' && firstResult.data) {
+        console.log('🔗 Chaining to createDocument after content generation');
+        
+        const createDocTool = this.toolRegistry.getTool('createDocument');
+        if (createDocTool) {
+          const title = `Generated Content - ${new Date().toLocaleDateString()}`;
+          const content = firstResult.data.content || firstResult.data.text || '';
+          
+          const docResult = await createDocTool.execute(userId, {
+            title,
+            content,
+            type: 'markdown',
+            destination: 'both' // Save both locally and to Drive
+          });
+          
+          if (docResult.success) {
+            return {
+              success: true,
+              data: {
+                generated_content: firstResult.data,
+                saved_document: docResult.data,
+                chained_tools: ['generateContentWithAI', 'createDocument']
+              }
+            };
+          }
+        }
+      }
+      
+      // 4. Document Processing -> Summary Document chaining
+      if (firstSelection.tool === 'processDocument' && firstResult.data) {
+        console.log('🔗 Chaining to createDocument after document processing');
+        
+        const createDocTool = this.toolRegistry.getTool('createDocument');
+        if (createDocTool && firstResult.data.summary) {
+          const title = `Document Summary - ${new Date().toLocaleDateString()}`;
+          const content = `# Document Summary\n\n**Original:** ${firstResult.data.fileName || 'Unknown'}\n\n**Summary:**\n${firstResult.data.summary}\n\n**Key Points:**\n${firstResult.data.keyPoints?.map((point: string) => `- ${point}`).join('\n') || 'None extracted'}`;
+          
+          const docResult = await createDocTool.execute(userId, {
+            title,
+            content,
+            type: 'markdown',
+            destination: 'both'
+          });
+          
+          if (docResult.success) {
+            return {
+              success: true,
+              data: {
+                processed_document: firstResult.data,
+                summary_document: docResult.data,
+                chained_tools: ['processDocument', 'createDocument']
+              }
+            };
           }
         }
       }

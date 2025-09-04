@@ -19,8 +19,6 @@ export const DriveFileCard: React.FC<DriveFileCardProps> = ({
   onShareFile
 }) => {
   const { colors } = useTheme();
-
-  // Add debugging
   
   const styles = StyleSheet.create({
     card: {

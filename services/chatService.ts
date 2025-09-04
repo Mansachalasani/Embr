@@ -756,8 +756,6 @@ export class ChatService {
   }
 
   private static processDriveSearchResponse(result: any): ChatMessage {
-    console.log('🔍 Processing Drive search response:', JSON.stringify(result, null, 2));
-    
     // Check if result has the expected structure
     if (!result?.data) {
       console.error('❌ Drive search result missing data field:', result);
@@ -796,8 +794,6 @@ export class ChatService {
         query
       }
     };
-
-    console.log('✅ Created driveResult:', JSON.stringify(driveResult, null, 2));
 
     return this.createMessage(
       'assistant',

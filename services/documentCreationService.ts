@@ -3,10 +3,10 @@ import { Alert } from 'react-native';
 import { AIService } from './aiService';
 
 export interface DocumentCreationRequest {
-  title: string;
+  title?: string;
   content: string;
-  type: 'text' | 'markdown' | 'html' | 'json';
-  saveLocation: 'local' | 'drive' | 'both';
+  type?: 'text' | 'markdown' | 'html' | 'json';
+  saveLocation?: 'local' | 'drive' | 'both';
   mimeType?: string;
 }
 
@@ -24,28 +24,44 @@ export class DocumentCreationService {
    */
   static async createDocument(request: DocumentCreationRequest): Promise<DocumentCreationResult> {
     try {
+      // Apply defaults if not provided
+      const processedRequest = {
+        title: request.title || `Document_${new Date().toISOString().slice(0, 19).replace(/[T:]/g, '_')}`,
+        content: request.content || 'This document was created automatically.',
+        type: request.type || 'text',
+        saveLocation: request.saveLocation || 'both',
+        mimeType: request.mimeType
+      };
+
+      console.log('📄 Creating document with defaults applied:', {
+        title: processedRequest.title,
+        type: processedRequest.type,
+        saveLocation: processedRequest.saveLocation,
+        contentLength: processedRequest.content.length
+      });
+
       const result: DocumentCreationResult = { success: false };
 
-      if (request.saveLocation === 'local' || request.saveLocation === 'both') {
-        const localResult = await this.saveDocumentLocally(request);
+      if (processedRequest.saveLocation === 'local' || processedRequest.saveLocation === 'both') {
+        const localResult = await this.saveDocumentLocally(processedRequest);
         if (localResult.success) {
           result.localPath = localResult.path;
         } else {
           result.error = localResult.error;
-          if (request.saveLocation === 'local') {
+          if (processedRequest.saveLocation === 'local') {
             return result;
           }
         }
       }
 
-      if (request.saveLocation === 'drive' || request.saveLocation === 'both') {
-        const driveResult = await this.saveDocumentToDrive(request);
+      if (processedRequest.saveLocation === 'drive' || processedRequest.saveLocation === 'both') {
+        const driveResult = await this.saveDocumentToDrive(processedRequest);
         if (driveResult.success) {
           result.driveFileId = driveResult.fileId;
           result.driveWebViewLink = driveResult.webViewLink;
         } else {
           result.error = driveResult.error;
-          if (request.saveLocation === 'drive') {
+          if (processedRequest.saveLocation === 'drive') {
             return result;
           }
         }
@@ -145,12 +161,21 @@ export class DocumentCreationService {
   /**
    * Save document locally
    */
-  private static async saveDocumentLocally(request: DocumentCreationRequest): Promise<{ success: boolean; path?: string; error?: string }> {
+  private static async saveDocumentLocally(request: any): Promise<{ success: boolean; path?: string; error?: string }> {
     try {
       const extension = this.getFileExtension(request.type);
       const sanitizedTitle = request.title.replace(/[^a-zA-Z0-9\s-_]/g, '').trim();
       const fileName = `${sanitizedTitle}.${extension}`;
-      const filePath = `${FileSystem.documentDirectory}${fileName}`;
+      
+      // Create a Documents folder if it doesn't exist
+      const documentsDir = `${FileSystem.documentDirectory}Documents/`;
+      const dirInfo = await FileSystem.getInfoAsync(documentsDir);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(documentsDir, { intermediates: true });
+        console.log('📁 Created Documents directory:', documentsDir);
+      }
+      
+      const filePath = `${documentsDir}${fileName}`;
 
       await FileSystem.writeAsStringAsync(filePath, request.content, {
         encoding: FileSystem.EncodingType.UTF8
