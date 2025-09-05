@@ -272,19 +272,32 @@ router.post('/speak', authenticateToken, upload.single('audio'), async (req: Aut
 
     console.log(`🔊 Speech synthesis completed, returning ${ttsResult.audioData.length} bytes`);
 
-    // Sanitize header values to prevent invalid characters
-    const sanitizeHeader = (text: string) => text.replace(/[^\x20-\x7E]/g, '').substring(0, 200);
+    // Sanitize header values to prevent invalid characters (increased limit for better UX)
+    const sanitizeHeader = (text: string) => {
+      const cleaned = text.replace(/[^\x20-\x7E]/g, '');
+      // Use larger limit and add truncation indicator
+      return cleaned.length > 1000 ? cleaned.substring(0, 1000) + '...' : cleaned;
+    };
 
-    // Return audio response
+    // Create response object with full content
+    const responseData = {
+      audioData: ttsResult.audioData,
+      userText: speechResult.text,
+      aiResponse: aiResponse.naturalResponse,
+      toolUsed: aiResponse.toolUsed || '',
+      rawData: aiResponse.rawData
+    };
+
+    // Return multipart response with both audio and full text
     res.set({
-      'Content-Type': 'audio/wav',
-      'Content-Length': ttsResult.audioData.length.toString(),
+      'Content-Type': 'application/json',
       'X-User-Text': sanitizeHeader(speechResult.text),
       'X-AI-Text': sanitizeHeader(aiResponse.naturalResponse),
       'X-Tool-Used': sanitizeHeader(aiResponse.toolUsed || ''),
+      'X-Has-Audio': 'true',
     });
 
-    res.send(ttsResult.audioData);
+    res.json(responseData);
 
   } catch (error) {
     console.error('❌ Error in speech processing:', error);

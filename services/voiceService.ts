@@ -572,22 +572,54 @@ async speechToTextFromBase64(base64Audio: string): Promise<{
         throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const audioData = await response.arrayBuffer();
-      const userText = response.headers.get('X-User-Text') || '';
-      const aiText = response.headers.get('X-AI-Text') || '';
-      const toolUsed = response.headers.get('X-Tool-Used') || '';
+      // Handle new JSON response format with full content
+      const hasAudio = response.headers.get('X-Has-Audio') === 'true';
+      
+      if (hasAudio) {
+        // New JSON format with full content
+        const responseData = await response.json();
+        const audioData = new Uint8Array(responseData.audioData.data || responseData.audioData);
+        const userText = responseData.userText || '';
+        const aiText = responseData.aiResponse || '';
+        const toolUsed = responseData.toolUsed || '';
+        
+        console.log('📢 Received full voice response:', {
+          userTextLength: userText.length,
+          aiTextLength: aiText.length,
+          audioDataLength: audioData.length,
+          toolUsed
+        });
 
-      console.log('🔊 Received audio response:', audioData.byteLength, 'bytes');
-      console.log('🎤 User said:', userText);
-      console.log('🧠 AI responded:', aiText);
+        console.log('🔊 Received audio response:', audioData.byteLength, 'bytes');
+        console.log('🎤 User said:', userText);
+        console.log('🧠 AI responded:', aiText);
 
-      return {
-        success: true,
-        audioData,
-        userText,
-        aiText,
-        toolUsed,
-      };
+        return {
+          success: true,
+          audioData: audioData.buffer,
+          userText,
+          aiText,
+          toolUsed,
+        };
+      } else {
+        // Fallback to old header-based format
+        const audioData = await response.arrayBuffer();
+        const userText = response.headers.get('X-User-Text') || '';
+        const aiText = response.headers.get('X-AI-Text') || '';
+        const toolUsed = response.headers.get('X-Tool-Used') || '';
+
+        console.log('🔊 Received audio response (legacy):', audioData.byteLength, 'bytes');
+        console.log('🎤 User said:', userText);
+        console.log('🧠 AI responded:', aiText);
+
+        return {
+          success: true,
+          audioData,
+          userText,
+          aiText,
+          toolUsed,
+        };
+      }
     } catch (error) {
       console.error('❌ Error processing voice message:', error);
       return {

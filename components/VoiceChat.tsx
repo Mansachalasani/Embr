@@ -451,13 +451,15 @@ export function VoiceChat({
       const result = await VoiceService.processVoiceMessage(audioUri);
       
       if (result.success && result.audioData && result.userText && result.aiText) {
+        
+        // Notify parent component
+        onVoiceMessage?.(result.userText, result.aiText, result.audioData);
+        
         // Play the AI response
         setIsPlaying(true);
         await VoiceService.playAudioResponse(result.audioData);
         setIsPlaying(false);
 
-        // Notify parent component
-        onVoiceMessage?.(result.userText, result.aiText, result.audioData);
 
         // Clean up the temporary audio file
         if (Platform.OS !== 'web') {
