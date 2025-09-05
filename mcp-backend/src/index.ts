@@ -30,26 +30,50 @@ for (const envVar of requiredEnvVars) {
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Security middleware
-app.use(helmet());
+// Security middleware - configure for development
+app.use(helmet({
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? true : false
+}));
 
 // CORS configuration
 const corsOrigins = process.env.CORS_ORIGINS?.split(',').map(origin => origin.trim()) || [
+  '*',
   'http://localhost:3000', 
-  'http://localhost:8081/', 
+  'http://localhost:8081', 
   'http://localhost:19000',
+  'http://localhost:19006', // Expo web default port
+  'http://127.0.0.1:19006',
   'exp://localhost:19000',
   'exp://127.0.0.1:19000',
   'http://localhost:8084',
 ];
 
 console.log('🌐 CORS Origins:', corsOrigins);
-
+console.log(process.env.NODE_ENV);
 app.use(cors({
-  origin: corsOrigins,
+  origin: (origin, callback) => {
+    console.log(origin,'its origin')
+    console.log(process.env.NODE_ENV === 'development','fjiutgiehgiuehrgiuhetgiuhtughg')
+    console.log('🌐 CORS request from origin:', origin);
+    if (process.env.NODE_ENV === 'development') {
+      console.log("from devs ori")
+      callback(null, true); // Allow all origins in development
+    } else {
+      callback(null, corsOrigins.includes(origin || ''));
+    }
+  },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'Accept',
+    'x-timezone',
+    'Origin'
+  ],
 }));
 
 // Request parsing
