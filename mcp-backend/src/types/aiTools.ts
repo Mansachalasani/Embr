@@ -49,5 +49,6 @@ export interface UserContext {
     includeActions: boolean;
     isVoiceMode?: boolean;
     cleanForSpeech?: boolean;
+    isVoiceQuery?: boolean;
   };
 }

@@ -311,18 +311,28 @@ Original Query: "${context.query}"
 Tool Used: ${selection.tool}
 Raw Data: ${JSON.stringify(toolResult.data, null, 2)}${conversationContext}
 
+${toolResult.data.auto_crawled ? 
+`🔍 **SPECIAL INSTRUCTION**: This query involved automatically visiting and scraping ${toolResult.data.total_sites_crawled} websites to provide comprehensive information. Synthesize ALL the crawled content into a cohesive response.` : ''}
+
 Instructions:
 - Write in a friendly, conversational tone
 - Use conversation history to maintain context and continuity
 - Focus on what the user asked for specifically
 - **Handle chained operations**: If multiple tools were used, explain what was done in sequence
+- **Multi-site web scraping**: If multiple websites were crawled automatically:
+  * Synthesize information from ALL crawled sites into a comprehensive answer
+  * Compare and contrast information from different sources when relevant
+  * Mention that you "visited and analyzed multiple websites" to gather the information
+  * Highlight any conflicting information between sources
+  * Present the information in a well-organized, easy-to-understand format
 - **Document creation**: If a document was created, mention where it was saved (locally/Drive) and provide any access links
-- **Tool chaining**: When tools were chained, explain the workflow (e.g., "I retrieved your emails and created a summary document")
+- **Tool chaining**: When tools were chained, explain the workflow (e.g., "I searched the web and then visited multiple sites to gather detailed information")
 - If it's calendar data, mention times and key details
 - If it's email data, summarize key messages
 - If it's file/drive data, mention file types, sizes, and locations
-- Keep it concise but informative
-- ${context.preferences?.isVoiceMode ? 'NO emojis, markdown, or special formatting - plain text only for speech synthesis' : 'Use emojis sparingly and appropriately'}
+- For research/voice queries, be comprehensive since the user expects detailed information
+- Keep it informative and well-structured
+- ${context.preferences?.isVoiceMode || context.preferences?.isVoiceQuery ? 'Structure for voice consumption - use clear transitions and organize information logically for audio' : 'Use appropriate formatting (markdown, lists, etc.) for readability'}
 - If the data is empty or minimal, acknowledge that naturally
 - Reference previous messages when relevant (e.g., "As I mentioned earlier...")
 - ${context.preferences?.isVoiceMode ? 'Speak naturally as if talking to someone in person' : 'Format appropriately for text display'}
@@ -374,17 +384,42 @@ Generate a natural response:
     
     const query = context.query.toLowerCase();
     
-    // 1. If we used searchWeb and got URLs that might be relevant, consider crawling them
+    // 1. Enhanced web search auto-chaining - automatically crawl multiple sites for comprehensive data
     if (selection.tool === 'searchWeb' && toolResult.data.results) {
       const results = toolResult.data.results;
-      // Check if query suggests user wants detailed content analysis
-      const wantsSummary = query.includes('summarize') ||
-                          query.includes('analyze') ||
-                          query.includes('what does') ||
-                          query.includes('content of');
       
-      // If we have results and user wants detailed analysis, chain to crawlPage
-      return wantsSummary && results.length > 0;
+      // Auto-crawl for these scenarios (make it more aggressive)
+      const shouldAutoCrawl = 
+        // Research and information gathering queries
+        query.includes('research') ||
+        query.includes('information about') ||
+        query.includes('tell me about') ||
+        query.includes('what is') ||
+        query.includes('explain') ||
+        query.includes('summarize') ||
+        query.includes('analyze') ||
+        query.includes('content of') ||
+        query.includes('details') ||
+        query.includes('learn about') ||
+        query.includes('find out about') ||
+        // Current events and news
+        query.includes('news') ||
+        query.includes('latest') ||
+        query.includes('recent') ||
+        query.includes('update') ||
+        // Comparison and analysis
+        query.includes('compare') ||
+        query.includes('versus') ||
+        query.includes('vs') ||
+        // Any query that seems to want comprehensive information
+        query.includes('comprehensive') ||
+        query.includes('detailed') ||
+        query.includes('complete') ||
+        // Voice mode queries tend to be more conversational
+        Boolean(context.preferences?.isVoiceQuery);
+      
+      // Auto-crawl if we have results and it's an information-seeking query
+      return shouldAutoCrawl && results.length > 0;
     }
     
     // 2. If we retrieved emails/calendar/drive data and user wants to create a document
@@ -423,30 +458,77 @@ Generate a natural response:
       
       const query = context.query.toLowerCase();
       
-      // 1. SearchWeb -> CrawlPage chaining
+      // 1. Enhanced SearchWeb -> Multi-CrawlPage chaining
       if (firstSelection.tool === 'searchWeb' && firstResult.data.results) {
-        const topResult = firstResult.data.results[0];
-        if (topResult && topResult.url) {
-          console.log('🔗 Chaining to crawlPage for URL:', topResult.url);
+        console.log('🔗 Chaining to crawlPage for multiple URLs');
+        
+        const crawlTool = this.toolRegistry.getTool('crawlPage');
+        if (crawlTool) {
+          const results = firstResult.data.results;
+          const crawledContent: any[] = [];
           
-          const crawlTool = this.toolRegistry.getTool('crawlPage');
-          if (crawlTool) {
-            const crawlResult = await crawlTool.execute(userId, {
-              url: topResult.url,
-              extract_content: true,
-              max_length: 3000
-            });
+          // Determine how many sites to crawl based on query complexity
+          const isComprehensiveQuery = query.includes('comprehensive') || 
+                                      query.includes('detailed') || 
+                                      query.includes('research') ||
+                                      query.includes('compare') ||
+                                      Boolean(context.preferences?.isVoiceQuery);
+          
+          const maxSitesToCrawl = isComprehensiveQuery ? 
+            Math.min(results.length, 5) :  // Crawl up to 5 sites for comprehensive queries
+            Math.min(results.length, 3);   // Crawl up to 3 sites for regular queries
+          
+          console.log(`🕷️ Auto-crawling ${maxSitesToCrawl} sites for comprehensive data`);
+          
+          // Crawl multiple sites concurrently for speed
+          const crawlPromises = results.slice(0, maxSitesToCrawl).map(async (result: any, index: number) => {
+            if (!result.url) return null;
             
-            if (crawlResult.success) {
-              return {
-                success: true,
-                data: {
-                  search_results: firstResult.data,
-                  crawled_content: crawlResult.data,
-                  chained_tools: ['searchWeb', 'crawlPage']
-                }
-              };
+            try {
+              console.log(`🔗 Crawling site ${index + 1}: ${result.title}`);
+              const crawlResult = await crawlTool.execute(userId, {
+                url: result.url,
+                extract_content: true,
+                max_length: 2000 // Slightly smaller per site to fit more content
+              });
+
+              if (crawlResult.success) {
+                return {
+                  search_result: result,
+                  content: crawlResult.data,
+                  crawl_index: index + 1
+                };
+              }
+              return null;
+            } catch (error) {
+              console.warn(`⚠️ Failed to crawl ${result.url}:`, error);
+              return null;
             }
+          });
+
+          // Wait for all crawls to complete (with timeout)
+          const crawlResults = await Promise.allSettled(crawlPromises);
+          
+          crawlResults.forEach((result, index) => {
+            if (result.status === 'fulfilled' && result.value) {
+              crawledContent.push(result.value);
+            }
+          });
+
+          console.log(`✅ Successfully crawled ${crawledContent.length} out of ${maxSitesToCrawl} sites`);
+
+          if (crawledContent.length > 0) {
+            return {
+              success: true,
+              data: {
+                search_results: firstResult.data,
+                crawled_sites: crawledContent,
+                total_sites_crawled: crawledContent.length,
+                chained_tools: ['searchWeb', 'crawlPage'],
+                auto_crawled: true,
+                comprehensive_data: true
+              }
+            };
           }
         }
       }

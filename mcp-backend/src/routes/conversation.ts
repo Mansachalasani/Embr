@@ -219,6 +219,8 @@ router.post('/speak', authenticateToken, upload.single('audio'), async (req: Aut
       preferences: {
         responseStyle: 'conversational',
         includeActions: false, // Disable suggested actions in voice mode
+        isVoiceQuery: true, // Flag to enable enhanced web scraping for voice queries
+        isVoiceMode: true,  // Flag for voice-specific response formatting
       },
     };
 
@@ -327,6 +329,8 @@ router.post('/text', authenticateToken, async (req: AuthenticatedRequest, res) =
       preferences: {
         responseStyle: 'conversational',
         includeActions: false, // No suggested actions in conversation mode
+        isVoiceQuery: true, // Enable enhanced web scraping for conversational queries
+        isVoiceMode: false, // Text mode, not audio
       },
     };
 
