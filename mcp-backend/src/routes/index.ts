@@ -6,6 +6,7 @@ import sessionRoutes from './sessions';
 import streamingRoutes from './streaming';
 import externalMcpRoutes from './externalMcp';
 import conversationRoutes from './conversation';
+import userPreferencesRoutes from './userPreferences';
 
 const router = express.Router();
 
@@ -38,6 +39,7 @@ router.get('/', (req, res) => {
         sessions: '/api/sessions/*',
         streaming: '/api/streaming/*',
         conversation: '/api/conversation/*',
+        'user-preferences': '/api/user/*',
         health: '/api/health',
       },
     },
@@ -53,5 +55,6 @@ router.use('/ai', aiRoutes);
 router.use('/sessions', sessionRoutes);
 router.use('/streaming', streamingRoutes);
 router.use('/conversation', conversationRoutes);
+router.use('/user', userPreferencesRoutes);
 
 export default router;

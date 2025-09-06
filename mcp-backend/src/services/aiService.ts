@@ -22,14 +22,88 @@ export class AIService {
   }
 
   /**
+   * Enrich user context with personalization preferences
+   */
+  private async enrichContextWithPreferences(context: UserContext, userId: string): Promise<UserContext> {
+    try {
+      const { supabase } = require('../config/supabase');
+      
+      // Fetch user preferences from database
+      const { data, error } = await supabase
+        .from('user_preferences')
+        .select('preferences, onboarding_completed')
+        .eq('user_id', userId)
+        .single();
+
+      if (error || !data?.preferences) {
+        console.log('📋 No user preferences found, using defaults');
+        return context; // Return original context if no preferences found
+      }
+
+      const preferences = data.preferences;
+      console.log('🎨 Enriching context with user preferences:', {
+        tone: preferences.communicationStyle?.tone,
+        detailLevel: preferences.communicationStyle?.detail_level,
+        interests: preferences.contentPreferences?.primary_interests?.length || 0,
+        onboardingCompleted: data.onboarding_completed
+      });
+
+      // Create enriched context with preferences
+      const enrichedContext: UserContext = {
+        ...context,
+        preferences: {
+          ...context.preferences,
+          // Map user personalization data to existing preferences structure
+          responseStyle: this.mapDetailLevelToResponseStyle(preferences.communicationStyle?.detail_level),
+          includeActions: preferences.assistantBehavior?.suggest_related_topics || false,
+          isVoiceMode: context.preferences?.isVoiceMode || false,
+          cleanForSpeech: context.preferences?.cleanForSpeech || false,
+          isVoiceQuery: context.preferences?.isVoiceQuery || false,
+        },
+        // Add personalization data for AI prompt generation
+        personalization: {
+          userPreferences: preferences,
+          onboardingCompleted: data.onboarding_completed,
+          currentContext: {
+            timeOfDay: new Date().getHours() < 12 ? 'morning' : 
+                      new Date().getHours() < 17 ? 'afternoon' : 'evening',
+            dayOfWeek: new Date().toLocaleDateString('en-US', { weekday: 'long' }),
+            timestamp: new Date().toISOString(),
+          }
+        }
+      };
+
+      return enrichedContext;
+    } catch (error) {
+      console.error('❌ Error enriching context with preferences:', error);
+      return context; // Fallback to original context on error
+    }
+  }
+
+  /**
+   * Map detail level preference to response style
+   */
+  private mapDetailLevelToResponseStyle(detailLevel?: string): 'brief' | 'detailed' | 'conversational' {
+    switch (detailLevel) {
+      case 'brief': return 'brief';
+      case 'detailed': 
+      case 'comprehensive': return 'detailed';
+      default: return 'conversational';
+    }
+  }
+
+  /**
    * Main AI reasoning pipeline
    */
   async processQuery(context: UserContext, userId: string): Promise<AIResponse> {
     try {
       console.log('🧠 AI Processing query:', context.query);
       
+      // Step 0: Fetch user preferences for personalized responses
+      const enrichedContext = await this.enrichContextWithPreferences(context, userId);
+      
       // Step 1: Analyze query and select tool
-      const toolSelection = await this.selectTool(context, userId);
+      const toolSelection = await this.selectTool(enrichedContext, userId);
       
       console.log(toolSelection)
       if (!toolSelection) {
@@ -66,13 +140,13 @@ export class AIService {
       
       // Step 2.5: Check if we need tool chaining
       let chainedResult = null;
-      if (toolResult.success && this.shouldChainTool(toolSelection, toolResult, context)) {
-        chainedResult = await this.performToolChaining(toolSelection, toolResult, userId, context);
+      if (toolResult.success && this.shouldChainTool(toolSelection, toolResult, enrichedContext)) {
+        chainedResult = await this.performToolChaining(toolSelection, toolResult, userId, enrichedContext);
       }
       
       // Step 3: Generate natural language response
       const finalResult = chainedResult || toolResult;
-      const naturalResponse = await this.generateResponse(context, toolSelection, finalResult, userId);
+      const naturalResponse = await this.generateResponse(enrichedContext, toolSelection, finalResult, userId);
       
       return {
         success: true,
@@ -283,6 +357,113 @@ Guidelines:
   }
 
   /**
+   * Build personalization prompt based on user preferences
+   */
+  private buildPersonalizationPrompt(context: UserContext): string {
+    if (!context.personalization?.userPreferences) {
+      return '';
+    }
+
+    const prefs = context.personalization.userPreferences;
+    const contextData = context.personalization.currentContext;
+    
+    let prompt = '\n**PERSONALIZATION CONTEXT**:\n';
+    
+    // User Info
+    if (prefs.personalInfo?.name) {
+      prompt += `- User's name: ${prefs.personalInfo.name}\n`;
+    }
+    if (prefs.personalInfo?.profession) {
+      prompt += `- Profession: ${prefs.personalInfo.profession}\n`;
+    }
+    
+    // Communication Style
+    if (prefs.communicationStyle) {
+      prompt += `- Preferred tone: ${prefs.communicationStyle.tone || 'balanced'}\n`;
+      prompt += `- Detail level: ${prefs.communicationStyle.detail_level || 'moderate'}\n`;
+      prompt += `- Explanation style: ${prefs.communicationStyle.explanation_style || 'examples-heavy'}\n`;
+      if (prefs.communicationStyle.use_analogies) {
+        prompt += `- User likes analogies and metaphors\n`;
+      }
+      if (prefs.communicationStyle.include_examples) {
+        prompt += `- Include practical examples\n`;
+      }
+    }
+    
+    // Interests
+    if (prefs.contentPreferences?.primary_interests?.length > 0) {
+      prompt += `- Primary interests: ${prefs.contentPreferences.primary_interests.join(', ')}\n`;
+    }
+    if (prefs.contentPreferences?.learning_style) {
+      prompt += `- Learning style: ${prefs.contentPreferences.learning_style}\n`;
+    }
+    if (prefs.contentPreferences?.preferred_formats?.length > 0) {
+      prompt += `- Preferred formats: ${prefs.contentPreferences.preferred_formats.join(', ')}\n`;
+    }
+    
+    // Assistant Behavior
+    if (prefs.assistantBehavior) {
+      prompt += `- Proactivity level: ${prefs.assistantBehavior.proactivity_level || 'suggestive'}\n`;
+      prompt += `- Personality: ${prefs.assistantBehavior.personality || 'helpful'}\n`;
+      if (prefs.assistantBehavior.follow_up_questions) {
+        prompt += `- User appreciates follow-up questions\n`;
+      }
+      if (prefs.assistantBehavior.suggest_related_topics) {
+        prompt += `- User likes topic suggestions\n`;
+      }
+    }
+    
+    // Work Context (if relevant)
+    if (prefs.workPreferences?.work_schedule) {
+      prompt += `- Most productive time: ${prefs.workPreferences.work_schedule}\n`;
+    }
+    if (prefs.workPreferences?.productivity_style) {
+      prompt += `- Work style: ${prefs.workPreferences.productivity_style}\n`;
+    }
+    
+    // Domain-Specific 
+    if (prefs.domainPreferences?.tech_stack?.length > 0) {
+      prompt += `- Tech stack: ${prefs.domainPreferences.tech_stack.join(', ')}\n`;
+    }
+    if (prefs.domainPreferences?.business_focus?.length > 0) {
+      prompt += `- Business areas: ${prefs.domainPreferences.business_focus.join(', ')}\n`;
+    }
+    
+    // Current Context
+    if (contextData) {
+      prompt += `- Time context: ${contextData.timeOfDay}, ${contextData.dayOfWeek}\n`;
+    }
+    
+    prompt += '\n**IMPORTANT**: Adapt your response to match these preferences while maintaining helpfulness and accuracy.\n';
+    
+    return prompt;
+  }
+
+  /**
+   * Get tone instruction based on user preferences
+   */
+  private getToneInstruction(context: UserContext): string {
+    const tone = context.personalization?.userPreferences?.communicationStyle?.tone || 'friendly';
+    
+    switch (tone) {
+      case 'professional':
+        return 'Write in a professional, business-appropriate tone';
+      case 'casual':
+        return 'Use a relaxed, informal, conversational tone';
+      case 'friendly':
+        return 'Be warm, supportive, and approachable';
+      case 'formal':
+        return 'Use structured, precise, and academic language';
+      case 'enthusiastic':
+        return 'Be energetic, encouraging, and positive';
+      case 'balanced':
+        return 'Adapt your tone to match the context and topic';
+      default:
+        return 'Write in a friendly, conversational tone';
+    }
+  }
+
+  /**
    * Generate natural language response from tool result with conversation context
    */
   public async generateResponse(context: UserContext, selection: AIToolSelection, toolResult: any, userId?: string): Promise<string> {
@@ -304,6 +485,9 @@ Guidelines:
       }
     }
 
+    // Build personalization context
+    const personalizationPrompt = this.buildPersonalizationPrompt(context);
+
     const prompt = `
 You are a helpful personal assistant. Convert this raw data into a natural, conversational response.
 
@@ -314,8 +498,10 @@ Raw Data: ${JSON.stringify(toolResult.data, null, 2)}${conversationContext}
 ${toolResult.data.auto_crawled ? 
 `🔍 **SPECIAL INSTRUCTION**: This query involved automatically visiting and scraping ${toolResult.data.total_sites_crawled} websites to provide comprehensive information. Synthesize ALL the crawled content into a cohesive response.` : ''}
 
+${personalizationPrompt}
+
 Instructions:
-- Write in a friendly, conversational tone
+- ${this.getToneInstruction(context)}
 - Use conversation history to maintain context and continuity
 - Focus on what the user asked for specifically
 - **Handle chained operations**: If multiple tools were used, explain what was done in sequence

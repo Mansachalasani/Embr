@@ -51,4 +51,13 @@ export interface UserContext {
     cleanForSpeech?: boolean;
     isVoiceQuery?: boolean;
   };
+  personalization?: {
+    userPreferences: any; // User's complete preference data
+    onboardingCompleted: boolean;
+    currentContext: {
+      timeOfDay: string;
+      dayOfWeek: string;
+      timestamp: string;
+    };
+  };
 }

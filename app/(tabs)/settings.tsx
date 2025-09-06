@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,11 +6,31 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { router } from 'expo-router';
+import { UserPreferencesService } from '../../services/userPreferencesService';
+import { UserPersonalizationData } from '../../types/userPreferences';
 
 export default function Settings() {
   const { user, signOut } = useAuth();
   const { colors, toggleTheme, isDark } = useTheme();
   const [loading, setLoading] = useState(false);
+  const [userPreferences, setUserPreferences] = useState<UserPersonalizationData | null>(null);
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
+
+  useEffect(() => {
+    loadUserPreferences();
+  }, []);
+
+  const loadUserPreferences = async () => {
+    try {
+      const result = await UserPreferencesService.getUserPreferences();
+      if (result.success) {
+        setUserPreferences(result.preferences);
+        setOnboardingCompleted(result.onboarding_completed);
+      }
+    } catch (error) {
+      console.error('Error loading preferences:', error);
+    }
+  };
 
   const handleSignOut = async () => {
     setLoading(true);
@@ -18,7 +38,93 @@ export default function Settings() {
     // AuthContext will handle the redirect automatically
   };
 
+  const handleEditPreferences = () => {
+    router.push('/preferences-edit');
+  };
+
+  const handleResetOnboarding = async () => {
+    Alert.alert(
+      'Reset Personalization',
+      'This will reset your personalization settings and show the onboarding flow again. Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await UserPreferencesService.resetPreferences();
+              if (result.success) {
+                Alert.alert('Success', 'Personalization settings have been reset');
+                await loadUserPreferences();
+              } else {
+                Alert.alert('Error', result.error || 'Failed to reset preferences');
+              }
+            } catch (error) {
+              Alert.alert('Error', 'Failed to reset preferences');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const settingsItems = [
+    {
+      title: '🎯 Personalization',
+      items: [
+        {
+          title: 'Edit Preferences',
+          subtitle: onboardingCompleted ? 'Customize your AI experience' : 'Complete onboarding first',
+          icon: 'person-circle',
+          onPress: onboardingCompleted ? handleEditPreferences : () => Alert.alert('Onboarding Required', 'Please complete the onboarding flow first to access personalization settings.'),
+          disabled: !onboardingCompleted,
+          gradient: onboardingCompleted,
+        },
+        {
+          title: 'Communication Style',
+          subtitle: userPreferences?.communicationStyle ? 
+            `${userPreferences.communicationStyle.tone?.charAt(0).toUpperCase() + userPreferences.communicationStyle.tone?.slice(1)} tone` : 
+            'Not set',
+          icon: 'chatbubbles',
+          onPress: () => {},
+          info: true,
+        },
+        {
+          title: 'Religion',
+          subtitle: userPreferences?.personalInfo?.religion ? 
+            userPreferences.personalInfo.religion.charAt(0).toUpperCase() + userPreferences.personalInfo.religion.slice(1) : 
+            'Not set',
+          icon: 'library',
+          onPress: () => {},
+          info: true,
+        },
+        {
+          title: 'Hobbies',
+          subtitle: userPreferences?.personalInfo?.hobbies && userPreferences.personalInfo.hobbies.length > 0 ? 
+            `${userPreferences.personalInfo.hobbies.length} selected` : 
+            'Not set',
+          icon: 'game-controller',
+          onPress: () => {},
+          info: true,
+        },
+        {
+          title: 'Interests',
+          subtitle: userPreferences?.contentPreferences?.interests && userPreferences.contentPreferences.interests.length > 0 ? 
+            `${userPreferences.contentPreferences.interests.length} selected` : 
+            'Not set',
+          icon: 'newspaper',
+          onPress: () => {},
+          info: true,
+        },
+        {
+          title: 'Reset Personalization',
+          icon: 'refresh',
+          onPress: handleResetOnboarding,
+          disabled: !onboardingCompleted,
+        },
+      ],
+    },
     {
       title: '🔥 Embr Settings',
       items: [
@@ -139,6 +245,20 @@ export default function Settings() {
       fontWeight: '500',
       flex: 1,
     },
+    settingItemSubtitle: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      marginLeft: 12,
+      marginTop: 2,
+      flex: 1,
+    },
+    settingItemTextContainer: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    disabledItem: {
+      opacity: 0.5,
+    },
     signOutButton: {
       borderColor: colors.error,
       backgroundColor: colors.surface,
@@ -193,19 +313,75 @@ export default function Settings() {
       );
     }
 
-    return (
+    const isGradientItem = item.gradient && !item.disabled;
+    const containerStyle = [
+      styles.settingItem,
+      item.disabled && styles.disabledItem,
+      isGradientItem && { backgroundColor: 'transparent', borderWidth: 0 }
+    ];
+
+    const ItemContent = (
       <TouchableOpacity
-        key={itemIndex}
-        style={styles.settingItem}
-        onPress={item.onPress}
-        activeOpacity={0.7}
+        style={containerStyle}
+        onPress={item.disabled ? undefined : item.onPress}
+        activeOpacity={item.disabled ? 1 : 0.7}
+        disabled={item.disabled}
       >
         <View style={styles.settingItemContent}>
-          <Ionicons name={item.icon as any} size={22} color={colors.primary} />
-          <Text style={styles.settingItemText}>{item.title}</Text>
+          <Ionicons 
+            name={item.icon as any} 
+            size={22} 
+            color={isGradientItem ? '#fff' : item.disabled ? colors.textSecondary : colors.primary} 
+          />
+          <View style={styles.settingItemTextContainer}>
+            <Text style={[
+              styles.settingItemText, 
+              { 
+                color: isGradientItem ? '#fff' : item.disabled ? colors.textSecondary : colors.text,
+                marginLeft: 0 
+              }
+            ]}>
+              {item.title}
+            </Text>
+            {item.subtitle && (
+              <Text style={[
+                styles.settingItemSubtitle, 
+                { 
+                  color: isGradientItem ? 'rgba(255,255,255,0.8)' : colors.textSecondary,
+                  marginLeft: 0 
+                }
+              ]}>
+                {item.subtitle}
+              </Text>
+            )}
+          </View>
         </View>
-        <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+        {!item.info && (
+          <Ionicons 
+            name="chevron-forward" 
+            size={20} 
+            color={isGradientItem ? 'rgba(255,255,255,0.8)' : colors.textSecondary} 
+          />
+        )}
       </TouchableOpacity>
+    );
+
+    if (isGradientItem) {
+      return (
+        <LinearGradient
+          key={itemIndex}
+          colors={colors.gradientPrimary}
+          style={styles.settingItemGradient}
+        >
+          {ItemContent}
+        </LinearGradient>
+      );
+    }
+
+    return (
+      <View key={itemIndex}>
+        {ItemContent}
+      </View>
     );
   };
 
