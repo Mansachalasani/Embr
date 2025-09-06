@@ -22,7 +22,54 @@ export class AIService {
   }
 
   /**
-   * Enrich user context with personalization preferences
+   * Enrich context with complete user data (preferred method)
+   */
+  private enrichContextWithCompleteUserData(context: UserContext): UserContext {
+    const completeContext = context.completeUserContext;
+    if (!completeContext) return context;
+
+    // Build enhanced context with complete user data
+    const enhancedContext: UserContext = {
+      ...context,
+      preferences: {
+        ...context.preferences,
+        // Map user personalization data to existing preferences structure
+        responseStyle: completeContext.profile?.communicationStyle?.detail_level === 'brief' ? 'brief' :
+                      completeContext.profile?.communicationStyle?.detail_level === 'detailed' ? 'detailed' : 'conversational',
+        includeActions: completeContext.profile?.assistantBehavior?.suggest_related_topics || false,
+        isVoiceMode: context.preferences?.isVoiceMode || false,
+        cleanForSpeech: context.preferences?.cleanForSpeech || false,
+        isVoiceQuery: context.preferences?.isVoiceQuery || false,
+      },
+      // Enhanced personalization data
+      personalization: {
+        userPreferences: completeContext.profile,
+        googleAccount: completeContext.googleAccount,
+        currentContext: {
+          timeOfDay: completeContext.context.time_of_day,
+          dayOfWeek: completeContext.context.day_of_week,
+          timezone: completeContext.context.timezone,
+          timestamp: completeContext.context.fetched_at,
+        },
+        onboardingCompleted: completeContext.profile?.metadata?.onboarding_completed || false,
+      }
+    };
+
+    console.log('✅ Context enriched with complete user data:', {
+      googleName: completeContext.googleAccount?.name,
+      googleEmail: completeContext.googleAccount?.email,
+      profileName: completeContext.profile?.personalInfo?.name,
+      hasProfile: !!completeContext.profile,
+      communicationTone: completeContext.profile?.communicationStyle?.tone,
+      hobbiesCount: completeContext.profile?.personalInfo?.hobbies?.length || 0,
+      onboardingCompleted: completeContext.profile?.metadata?.onboarding_completed
+    });
+
+    return enhancedContext;
+  }
+
+  /**
+   * Enrich user context with personalization preferences (legacy method)
    */
   private async enrichContextWithPreferences(context: UserContext, userId: string): Promise<UserContext> {
     try {
@@ -69,6 +116,7 @@ export class AIService {
                       new Date().getHours() < 17 ? 'afternoon' : 'evening',
             dayOfWeek: new Date().toLocaleDateString('en-US', { weekday: 'long' }),
             timestamp: new Date().toISOString(),
+            timezone: context.timezone || 'UTC',
           }
         }
       };
@@ -97,10 +145,22 @@ export class AIService {
    */
   async processQuery(context: UserContext, userId: string): Promise<AIResponse> {
     try {
-      console.log('🧠 AI Processing query:', context.query);
+      console.log('🧠 AI Processing query with complete user context:', context.query);
       
-      // Step 0: Fetch user preferences for personalized responses
-      const enrichedContext = await this.enrichContextWithPreferences(context, userId);
+      // Step 0: Enhanced context enrichment with complete user data
+      let enrichedContext = context;
+      
+      // Check if we have complete user context from client
+      if (context.completeUserContext) {
+        console.log('✅ Using complete user context from client');
+        console.log('Google Account:', context.completeUserContext.googleAccount?.name, context.completeUserContext.googleAccount?.email);
+        console.log('Profile data:', !!context.completeUserContext.profile);
+        enrichedContext = this.enrichContextWithCompleteUserData(context);
+      } else {
+        // Fallback to legacy preference fetching
+        console.log('⚠️ No complete context, using legacy preference fetching');
+        enrichedContext = await this.enrichContextWithPreferences(context, userId);
+      }
       
       // Step 1: Analyze query and select tool
       const toolSelection = await this.selectTool(enrichedContext, userId);
@@ -357,84 +417,134 @@ Guidelines:
   }
 
   /**
-   * Build personalization prompt based on user preferences
+   * Build comprehensive personalization prompt with complete user context
    */
   private buildPersonalizationPrompt(context: UserContext): string {
-    if (!context.personalization?.userPreferences) {
-      return '';
-    }
+    let prompt = '';
 
-    const prefs = context.personalization.userPreferences;
-    const contextData = context.personalization.currentContext;
-    
-    let prompt = '\n**PERSONALIZATION CONTEXT**:\n';
-    
-    // User Info
-    if (prefs.personalInfo?.name) {
-      prompt += `- User's name: ${prefs.personalInfo.name}\n`;
-    }
-    if (prefs.personalInfo?.profession) {
-      prompt += `- Profession: ${prefs.personalInfo.profession}\n`;
-    }
-    
-    // Communication Style
-    if (prefs.communicationStyle) {
-      prompt += `- Preferred tone: ${prefs.communicationStyle.tone || 'balanced'}\n`;
-      prompt += `- Detail level: ${prefs.communicationStyle.detail_level || 'moderate'}\n`;
-      prompt += `- Explanation style: ${prefs.communicationStyle.explanation_style || 'examples-heavy'}\n`;
-      if (prefs.communicationStyle.use_analogies) {
-        prompt += `- User likes analogies and metaphors\n`;
+    // Check if we have complete user context
+    if (context.completeUserContext) {
+      const completeContext = context.completeUserContext;
+      
+      prompt += '\n=== COMPLETE USER CONTEXT ===\n\n';
+      
+      // Google Account Information
+      prompt += '🔐 **GOOGLE ACCOUNT:**\n';
+      if (completeContext.googleAccount?.name) {
+        prompt += `- Name: ${completeContext.googleAccount.name}\n`;
       }
-      if (prefs.communicationStyle.include_examples) {
-        prompt += `- Include practical examples\n`;
+      if (completeContext.googleAccount?.email) {
+        prompt += `- Email: ${completeContext.googleAccount.email}\n`;
+      }
+      prompt += `- User ID: ${completeContext.session?.user_id}\n`;
+      
+      // Current Context
+      prompt += '\n⏰ **CURRENT CONTEXT:**\n';
+      prompt += `- Current time: ${completeContext.context?.current_time}\n`;
+      prompt += `- Day: ${completeContext.context?.day_of_week}\n`;
+      prompt += `- Time of day: ${completeContext.context?.time_of_day}\n`;
+      prompt += `- Timezone: ${completeContext.context?.timezone}\n`;
+      
+      // Profile Information (if available)
+      if (completeContext.profile) {
+        prompt += '\n👤 **USER PROFILE:**\n';
+        
+        // Personal Info
+        const personal = completeContext.profile.personalInfo;
+        if (personal?.name && personal.name !== completeContext.googleAccount?.name) {
+          prompt += `- Preferred name: ${personal.name}\n`;
+        }
+        if (personal?.profession) {
+          prompt += `- Profession: ${personal.profession}`;
+          if (personal.industry) prompt += ` (${personal.industry})`;
+          if (personal.experience_level) prompt += ` - ${personal.experience_level} level`;
+          prompt += '\n';
+        }
+        if (personal?.hobbies && personal.hobbies.length > 0) {
+          prompt += `- Hobbies: ${personal.hobbies.join(', ')}\n`;
+        }
+        
+        // Communication Style
+        const commStyle = completeContext.profile.communicationStyle;
+        if (commStyle) {
+          prompt += '\n💬 **COMMUNICATION PREFERENCES:**\n';
+          prompt += `- Tone: ${commStyle.tone}\n`;
+          prompt += `- Detail level: ${commStyle.detail_level}\n`;
+          prompt += `- Response length: ${commStyle.response_length}\n`;
+          prompt += `- Explanation style: ${commStyle.explanation_style}\n`;
+          if (commStyle.use_analogies) prompt += '- LOVES analogies and metaphors\n';
+          if (commStyle.include_examples) prompt += '- Always include practical examples\n';
+        }
+        
+        // Interests
+        const content = completeContext.profile.contentPreferences;
+        if (content?.primary_interests && content.primary_interests.length > 0) {
+          prompt += '\n🎯 **INTERESTS:**\n';
+          prompt += `- Primary interests: ${content.primary_interests.join(', ')}\n`;
+          if (content.current_affairs_interests?.length) {
+            prompt += `- Current affairs: ${content.current_affairs_interests.join(', ')}\n`;
+          }
+          if (content.learning_style) {
+            prompt += `- Learning style: ${content.learning_style}\n`;
+          }
+        }
+        
+        // Work Preferences
+        const work = completeContext.profile.workPreferences;
+        if (work && Object.values(work).some(v => v)) {
+          prompt += '\n💼 **WORK STYLE:**\n';
+          if (work.work_schedule) prompt += `- Most productive: ${work.work_schedule}\n`;
+          if (work.productivity_style) prompt += `- Work style: ${work.productivity_style}\n`;
+          if (work.meeting_preferences) prompt += `- Meeting style: ${work.meeting_preferences}\n`;
+        }
+        
+        // Technology
+        const domain = completeContext.profile.domainPreferences;
+        if (domain?.tech_stack?.length) {
+          prompt += '\n💻 **TECHNOLOGY:**\n';
+          prompt += `- Tech stack: ${domain.tech_stack.join(', ')}\n`;
+          if (domain.coding_style) prompt += `- Coding style: ${domain.coding_style}\n`;
+        }
+        
+        // Assistant Behavior
+        const behavior = completeContext.profile.assistantBehavior;
+        if (behavior) {
+          prompt += '\n🤖 **ASSISTANT BEHAVIOR:**\n';
+          if (behavior.personality) prompt += `- Personality: ${behavior.personality}\n`;
+          if (behavior.proactivity_level) prompt += `- Proactivity: ${behavior.proactivity_level}\n`;
+          if (behavior.follow_up_questions) prompt += '- Ask follow-up questions\n';
+          if (behavior.suggest_related_topics) prompt += '- Suggest related topics\n';
+        }
+        
+        prompt += `\n- Profile last updated: ${completeContext.profile.metadata?.updated_at ? new Date(completeContext.profile.metadata.updated_at).toLocaleDateString() : 'Unknown'}\n`;
+        prompt += `- Onboarding completed: ${completeContext.profile.metadata?.onboarding_completed ? 'Yes' : 'No'}\n`;
+      } else {
+        prompt += '\n⚠️ **NO PROFILE DATA** - User has not completed preferences setup\n';
+      }
+      
+      prompt += '\n=== END COMPLETE CONTEXT ===\n';
+      
+    } else if (context.personalization?.userPreferences) {
+      // Fallback to legacy personalization (abbreviated)
+      const prefs = context.personalization.userPreferences;
+      
+      prompt += '\n**PERSONALIZATION CONTEXT**:\n';
+      if (prefs.personalInfo?.name) {
+        prompt += `- User's name: ${prefs.personalInfo.name}\n`;
+      }
+      if (prefs.communicationStyle?.tone) {
+        prompt += `- Preferred tone: ${prefs.communicationStyle.tone}\n`;
+      }
+      if (prefs.personalInfo?.hobbies?.length) {
+        prompt += `- Hobbies: ${prefs.personalInfo.hobbies.join(', ')}\n`;
       }
     }
     
-    // Interests
-    if (prefs.contentPreferences?.primary_interests?.length > 0) {
-      prompt += `- Primary interests: ${prefs.contentPreferences.primary_interests.join(', ')}\n`;
+    if (prompt) {
+      prompt += '\n**CRITICAL**: Use this context to provide personalized, relevant responses. ';
+      prompt += 'Address the user by their preferred name when appropriate, reference their interests and work when relevant, ';
+      prompt += 'and adapt your communication style to their exact preferences. Be human-like and genuinely helpful.\n\n';
     }
-    if (prefs.contentPreferences?.learning_style) {
-      prompt += `- Learning style: ${prefs.contentPreferences.learning_style}\n`;
-    }
-    if (prefs.contentPreferences?.preferred_formats?.length > 0) {
-      prompt += `- Preferred formats: ${prefs.contentPreferences.preferred_formats.join(', ')}\n`;
-    }
-    
-    // Assistant Behavior
-    if (prefs.assistantBehavior) {
-      prompt += `- Proactivity level: ${prefs.assistantBehavior.proactivity_level || 'suggestive'}\n`;
-      prompt += `- Personality: ${prefs.assistantBehavior.personality || 'helpful'}\n`;
-      if (prefs.assistantBehavior.follow_up_questions) {
-        prompt += `- User appreciates follow-up questions\n`;
-      }
-      if (prefs.assistantBehavior.suggest_related_topics) {
-        prompt += `- User likes topic suggestions\n`;
-      }
-    }
-    
-    // Work Context (if relevant)
-    if (prefs.workPreferences?.work_schedule) {
-      prompt += `- Most productive time: ${prefs.workPreferences.work_schedule}\n`;
-    }
-    if (prefs.workPreferences?.productivity_style) {
-      prompt += `- Work style: ${prefs.workPreferences.productivity_style}\n`;
-    }
-    
-    // Domain-Specific 
-    if (prefs.domainPreferences?.tech_stack?.length > 0) {
-      prompt += `- Tech stack: ${prefs.domainPreferences.tech_stack.join(', ')}\n`;
-    }
-    if (prefs.domainPreferences?.business_focus?.length > 0) {
-      prompt += `- Business areas: ${prefs.domainPreferences.business_focus.join(', ')}\n`;
-    }
-    
-    // Current Context
-    if (contextData) {
-      prompt += `- Time context: ${contextData.timeOfDay}, ${contextData.dayOfWeek}\n`;
-    }
-    
-    prompt += '\n**IMPORTANT**: Adapt your response to match these preferences while maintaining helpfulness and accuracy.\n';
     
     return prompt;
   }
@@ -865,5 +975,52 @@ Category: ${tool.category}
 Parameters: ${tool.parameters.map(p => `${p.name} (${p.type}${p.required ? ', required' : ''}): ${p.description}`).join(', ')}
 Examples: ${tool.examples.map(e => `"${e.query}"`).join(', ')}
 `).join('\n');
+  }
+
+  /**
+   * Analyze task complexity for continuous AI controller
+   */
+  async analyzeTaskComplexity(query: string): Promise<{ complexity: 'simple' | 'moderate' | 'complex', reasoning: string }> {
+    try {
+      // Simple heuristic-based analysis
+      const lowerQuery = query.toLowerCase();
+      
+      // Complex indicators
+      const complexIndicators = [
+        'analyze', 'research', 'compare', 'create document', 'generate report',
+        'comprehensive', 'detailed analysis', 'multi-step', 'complex', 'strategy'
+      ];
+      
+      // Simple indicators  
+      const simpleIndicators = [
+        'what is', 'tell me', 'show me', 'list', 'find', 'get', 'check'
+      ];
+      
+      const complexCount = complexIndicators.filter(indicator => lowerQuery.includes(indicator)).length;
+      const simpleCount = simpleIndicators.filter(indicator => lowerQuery.includes(indicator)).length;
+      
+      if (complexCount >= 2 || lowerQuery.length > 100) {
+        return {
+          complexity: 'complex',
+          reasoning: 'Query contains multiple complex indicators or is very detailed'
+        };
+      } else if (complexCount > 0 || (lowerQuery.length > 50 && simpleCount === 0)) {
+        return {
+          complexity: 'moderate',
+          reasoning: 'Query contains some complex elements or moderate detail'
+        };
+      } else {
+        return {
+          complexity: 'simple',
+          reasoning: 'Query is straightforward and direct'
+        };
+      }
+    } catch (error) {
+      console.error('Error analyzing task complexity:', error);
+      return {
+        complexity: 'moderate',
+        reasoning: 'Error in analysis, defaulting to moderate complexity'
+      };
+    }
   }
 }

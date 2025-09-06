@@ -10,169 +10,169 @@ export interface DeepLinkAction {
 export class DeepLinkingService {
   private static actions: DeepLinkAction[] = [
     // Phone & Contacts
-    // {
-    //   name: 'Make Phone Call',
-    //   description: 'Make a phone call to a contact or number',
-    //   keywords: ['call', 'phone', 'dial', 'ring'],
-    //   execute: async (query: string) => {
-    //     const phoneMatch = query.match(/(\+?\d[\d\s\-()]+)/);
-    //     const phoneNumber = phoneMatch ? phoneMatch[1].replace(/[^\d+]/g, '') : null;
+    {
+      name: 'Make Phone Call',
+      description: 'Make a phone call to a contact or number',
+      keywords: ['call', 'phone', 'dial', 'ring'],
+      execute: async (query: string) => {
+        const phoneMatch = query.match(/(\+?\d[\d\s\-()]+)/);
+        const phoneNumber = phoneMatch ? phoneMatch[1].replace(/[^\d+]/g, '') : null;
         
-    //     if (phoneNumber) {
-    //       const url = `tel:${phoneNumber}`;
-    //       const canOpen = await Linking.canOpenURL(url);
-    //       if (canOpen) {
-    //         await Linking.openURL(url);
-    //         return true;
-    //       }
-    //     }
-    //     return false;
-    //   }
-    // },
-    // {
-    //   name: 'Open Contacts',
-    //   description: 'Open the contacts app',
-    //   keywords: ['contacts', 'phonebook', 'address book'],
-    //   execute: async (query: string) => {
-    //     try {
-    //       await Linking.openURL('contacts://');
-    //       return true;
-    //     } catch {
-    //       // Fallback for different platforms
-    //       try {
-    //         await Linking.openURL('contact://');
-    //         return true;
-    //       } catch {
-    //         return false;
-    //       }
-    //     }
-    //   }
-    // },
+        if (phoneNumber) {
+          const url = `tel:${phoneNumber}`;
+          const canOpen = await Linking.canOpenURL(url);
+          if (canOpen) {
+            await Linking.openURL(url);
+            return true;
+          }
+        }
+        return false;
+      }
+    },
+    {
+      name: 'Open Contacts',
+      description: 'Open the contacts app',
+      keywords: ['contacts', 'phonebook', 'address book'],
+      execute: async (query: string) => {
+        try {
+          await Linking.openURL('contacts://');
+          return true;
+        } catch {
+          // Fallback for different platforms
+          try {
+            await Linking.openURL('contact://');
+            return true;
+          } catch {
+            return false;
+          }
+        }
+      }
+    },
     
     // // Amazon Shopping
-    // {
-    //   name: 'Amazon Search',
-    //   description: 'Search for products on Amazon',
-    //   keywords: ['amazon', 'shop', 'buy', 'purchase', 'order'],
-    //   execute: async (query: string) => {
-    //     // Extract search terms
-    //     const searchMatch = query.match(/(?:amazon|shop|buy|purchase|order)\s+(.+?)(?:\s+under\s+|\s+below\s+|\s*$)/i);
-    //     let searchTerm = searchMatch ? searchMatch[1] : '';
+    {
+      name: 'Amazon Search',
+      description: 'Search for products on Amazon',
+      keywords: ['amazon', 'shop', 'buy', 'purchase', 'order'],
+      execute: async (query: string) => {
+        // Extract search terms
+        const searchMatch = query.match(/(?:amazon|shop|buy|purchase|order)\s+(.+?)(?:\s+under\s+|\s+below\s+|\s*$)/i);
+        let searchTerm = searchMatch ? searchMatch[1] : '';
         
-    //     // Extract price if mentioned
-    //     const priceMatch = query.match(/under\s+(?:\$|₹|rs\.?\s*)?(\d+(?:k|,?\d{3})*)/i);
-    //     if (priceMatch) {
-    //       const price = priceMatch[1].replace(/k$/i, '000').replace(/,/g, '');
-    //       searchTerm += ` under ${price}`;
-    //     }
+        // Extract price if mentioned
+        const priceMatch = query.match(/under\s+(?:\$|₹|rs\.?\s*)?(\d+(?:k|,?\d{3})*)/i);
+        if (priceMatch) {
+          const price = priceMatch[1].replace(/k$/i, '000').replace(/,/g, '');
+          searchTerm += ` under ${price}`;
+        }
         
-    //     if (!searchTerm.trim()) {
-    //       // If no specific search term, extract from context
-    //       const contextMatch = query.match(/show\s+me\s+(.+)|find\s+(.+)|(.+)\s+on\s+amazon/i);
-    //       searchTerm = contextMatch ? (contextMatch[1] || contextMatch[2] || contextMatch[3]) : 'products';
-    //     }
+        if (!searchTerm.trim()) {
+          // If no specific search term, extract from context
+          const contextMatch = query.match(/show\s+me\s+(.+)|find\s+(.+)|(.+)\s+on\s+amazon/i);
+          searchTerm = contextMatch ? (contextMatch[1] || contextMatch[2] || contextMatch[3]) : 'products';
+        }
         
-    //     const encodedSearch = encodeURIComponent(searchTerm.trim());
-    //     const amazonUrl = `https://www.amazon.com/s?k=${encodedSearch}`;
+        const encodedSearch = encodeURIComponent(searchTerm.trim());
+        const amazonUrl = `https://www.amazon.com/s?k=${encodedSearch}`;
         
-    //     const canOpen = await Linking.canOpenURL(amazonUrl);
-    //     if (canOpen) {
-    //       await Linking.openURL(amazonUrl);
-    //       return true;
-    //     }
-    //     return false;
-    //   }
-    // },
+        const canOpen = await Linking.canOpenURL(amazonUrl);
+        if (canOpen) {
+          await Linking.openURL(amazonUrl);
+          return true;
+        }
+        return false;
+      }
+    },
     
     // // Spotify Music
-    // {
-    //   name: 'Spotify Play',
-    //   description: 'Play music on Spotify',
-    //   keywords: ['spotify', 'play', 'music', 'song', 'artist'],
-    //   execute: async (query: string) => {
-    //     // Extract song/artist name
-    //     const musicMatch = query.match(/(?:play|song|music)\s+(.+?)(?:\s+on\s+spotify|\s*$)/i);
-    //     let searchTerm = musicMatch ? musicMatch[1] : '';
+    {
+      name: 'Spotify Play',
+      description: 'Play music on Spotify',
+      keywords: ['spotify', 'play'],
+      execute: async (query: string) => {
+        // Extract song/artist name
+        const musicMatch = query.match(/(?:play|song|music)\s+(.+?)(?:\s+on\s+spotify|\s*$)/i);
+        let searchTerm = musicMatch ? musicMatch[1] : '';
         
-    //     if (!searchTerm.trim()) {
-    //       // Try different patterns
-    //       const altMatch = query.match(/spotify\s+(.+)/i);
-    //       searchTerm = altMatch ? altMatch[1] : 'music';
-    //     }
+        if (!searchTerm.trim()) {
+          // Try different patterns
+          const altMatch = query.match(/spotify\s+(.+)/i);
+          searchTerm = altMatch ? altMatch[1] : 'music';
+        }
         
-    //     const encodedSearch = encodeURIComponent(searchTerm.trim());
+        const encodedSearch = encodeURIComponent(searchTerm.trim());
         
-    //     // Try to open in Spotify app first
-    //     const spotifyAppUrl = `spotify:search:${encodedSearch}`;
-    //     try {
-    //       const canOpenApp = await Linking.canOpenURL(spotifyAppUrl);
-    //       if (canOpenApp) {
-    //         await Linking.openURL(spotifyAppUrl);
-    //         return true;
-    //       }
-    //     } catch (error) {
-    //       console.log('Spotify app not available, trying web version');
-    //     }
+        // Try to open in Spotify app first
+        const spotifyAppUrl = `spotify:search:${encodedSearch}`;
+        try {
+          const canOpenApp = await Linking.canOpenURL(spotifyAppUrl);
+          if (canOpenApp) {
+            await Linking.openURL(spotifyAppUrl);
+            return true;
+          }
+        } catch (error) {
+          console.log('Spotify app not available, trying web version');
+        }
         
-    //     // Fallback to web version
-    //     const spotifyWebUrl = `https://open.spotify.com/search/${encodedSearch}`;
-    //     const canOpenWeb = await Linking.canOpenURL(spotifyWebUrl);
-    //     if (canOpenWeb) {
-    //       await Linking.openURL(spotifyWebUrl);
-    //       return true;
-    //     }
+        // Fallback to web version
+        const spotifyWebUrl = `https://open.spotify.com/search/${encodedSearch}`;
+        const canOpenWeb = await Linking.canOpenURL(spotifyWebUrl);
+        if (canOpenWeb) {
+          await Linking.openURL(spotifyWebUrl);
+          return true;
+        }
         
-    //     return false;
-    //   }
-    // },
+        return false;
+      }
+    },
     
     // // Maps & Navigation
-    // {
-    //   name: 'Open Maps',
-    //   description: 'Open maps and navigate to a location',
-    //   keywords: ['maps', 'navigate', 'directions', 'location', 'go to'],
-    //   execute: async (query: string) => {
-    //     const locationMatch = query.match(/(?:maps|navigate|directions|go to)\s+(.+)/i);
-    //     const location = locationMatch ? locationMatch[1] : '';
+    {
+      name: 'Open Maps',
+      description: 'Open maps and navigate to a location',
+      keywords: ['maps', 'navigate', 'directions', 'location', 'go to'],
+      execute: async (query: string) => {
+        const locationMatch = query.match(/(?:maps|navigate|directions|go to)\s+(.+)/i);
+        const location = locationMatch ? locationMatch[1] : '';
         
-    //     if (location.trim()) {
-    //       const encodedLocation = encodeURIComponent(location.trim());
-    //       const mapsUrl = `https://maps.google.com/maps?q=${encodedLocation}`;
+        if (location.trim()) {
+          const encodedLocation = encodeURIComponent(location.trim());
+          const mapsUrl = `https://maps.google.com/maps?q=${encodedLocation}`;
           
-    //       const canOpen = await Linking.canOpenURL(mapsUrl);
-    //       if (canOpen) {
-    //         await Linking.openURL(mapsUrl);
-    //         return true;
-    //       }
-    //     }
-    //     return false;
-    //   }
-    // },
+          const canOpen = await Linking.canOpenURL(mapsUrl);
+          if (canOpen) {
+            await Linking.openURL(mapsUrl);
+            return true;
+          }
+        }
+        return false;
+      }
+    },
     
     // // YouTube
-    // {
-    //   name: 'YouTube Search',
-    //   description: 'Search for videos on YouTube',
-    //   keywords: ['youtube', 'video', 'watch', 'tutorial'],
-    //   execute: async (query: string) => {
-    //     const videoMatch = query.match(/(?:youtube|video|watch|tutorial)\s+(.+)/i);
-    //     let searchTerm = videoMatch ? videoMatch[1] : '';
+    {
+      name: 'YouTube Search',
+      description: 'Search for videos on YouTube',
+      keywords: ['youtube'],
+      execute: async (query: string) => {
+        const videoMatch = query.match(/(?:youtube|video|watch|tutorial)\s+(.+)/i);
+        let searchTerm = videoMatch ? videoMatch[1] : '';
         
-    //     if (!searchTerm.trim()) {
-    //       searchTerm = 'videos';
-    //     }
+        if (!searchTerm.trim()) {
+          searchTerm = 'videos';
+        }
         
-    //     const encodedSearch = encodeURIComponent(searchTerm.trim());
-    //     const youtubeUrl = `https://www.youtube.com/results?search_query=${encodedSearch}`;
+        const encodedSearch = encodeURIComponent(searchTerm.trim());
+        const youtubeUrl = `https://www.youtube.com/results?search_query=${encodedSearch}`;
         
-    //     const canOpen = await Linking.canOpenURL(youtubeUrl);
-    //     if (canOpen) {
-    //       await Linking.openURL(youtubeUrl);
-    //       return true;
-    //     }
-    //     return false;
-    //   }
-    // },
+        const canOpen = await Linking.canOpenURL(youtubeUrl);
+        if (canOpen) {
+          await Linking.openURL(youtubeUrl);
+          return true;
+        }
+        return false;
+      }
+    },
     
     // // Messages
     // {
@@ -222,113 +222,113 @@ export class DeepLinkingService {
     // },
 
     // // Social Media - Instagram
-    // {
-    //   name: 'Open Instagram',
-    //   description: 'Open Instagram app or search for users/hashtags',
-    //   keywords: ['instagram', 'insta', 'ig', 'gram'],
-    //   execute: async (query: string) => {
-    //     const userMatch = query.match(/(?:instagram|insta|ig)\s+(.+)/i);
-    //     const searchTerm = userMatch ? userMatch[1].trim() : '';
+    {
+      name: 'Open Instagram',
+      description: 'Open Instagram app or search for users/hashtags',
+      keywords: ['instagram', 'insta', 'ig', 'gram'],
+      execute: async (query: string) => {
+        const userMatch = query.match(/(?:instagram|insta|ig)\s+(.+)/i);
+        const searchTerm = userMatch ? userMatch[1].trim() : '';
         
-    //     if (searchTerm) {
-    //       // Try to open specific user profile or hashtag
-    //       const isHashtag = searchTerm.startsWith('#');
-    //       const cleanTerm = searchTerm.replace(/[@#]/g, '');
-    //       const encodedTerm = encodeURIComponent(cleanTerm);
+        if (searchTerm) {
+          // Try to open specific user profile or hashtag
+          const isHashtag = searchTerm.startsWith('#');
+          const cleanTerm = searchTerm.replace(/[@#]/g, '');
+          const encodedTerm = encodeURIComponent(cleanTerm);
           
-    //       const instagramUrl = isHashtag 
-    //         ? `https://www.instagram.com/explore/tags/${encodedTerm}/`
-    //         : `https://www.instagram.com/${encodedTerm}/`;
+          const instagramUrl = isHashtag 
+            ? `https://www.instagram.com/explore/tags/${encodedTerm}/`
+            : `https://www.instagram.com/${encodedTerm}/`;
           
-    //       const canOpen = await Linking.canOpenURL(instagramUrl);
-    //       if (canOpen) {
-    //         await Linking.openURL(instagramUrl);
-    //         return true;
-    //       }
-    //     } else {
-    //       // Just open Instagram
-    //       try {
-    //         await Linking.openURL('instagram://');
-    //         return true;
-    //       } catch {
-    //         await Linking.openURL('https://instagram.com');
-    //         return true;
-    //       }
-    //     }
-    //     return false;
-    //   }
-    // },
+          const canOpen = await Linking.canOpenURL(instagramUrl);
+          if (canOpen) {
+            await Linking.openURL(instagramUrl);
+            return true;
+          }
+        } else {
+          // Just open Instagram
+          try {
+            await Linking.openURL('instagram://');
+            return true;
+          } catch {
+            await Linking.openURL('https://instagram.com');
+            return true;
+          }
+        }
+        return false;
+      }
+    },
 
     // // Social Media - Twitter/X
-    // {
-    //   name: 'Open Twitter/X',
-    //   description: 'Open Twitter/X app or search for users/topics',
-    //   keywords: ['twitter', 'tweet', 'x.com', 'social'],
-    //   execute: async (query: string) => {
-    //     const userMatch = query.match(/(?:twitter|tweet|x)\s+(.+)/i);
-    //     const searchTerm = userMatch ? userMatch[1].trim() : '';
+    {
+      name: 'Open Twitter/X',
+      description: 'Open Twitter/X app or search for users/topics',
+      keywords: ['twitter', 'tweet', 'x.com'],
+      execute: async (query: string) => {
+        const userMatch = query.match(/(?:twitter|tweet|x)\s+(.+)/i);
+        const searchTerm = userMatch ? userMatch[1].trim() : '';
         
-    //     if (searchTerm) {
-    //       const isUser = searchTerm.startsWith('@');
-    //       const cleanTerm = searchTerm.replace(/@/g, '');
-    //       const encodedTerm = encodeURIComponent(cleanTerm);
+        if (searchTerm) {
+          const isUser = searchTerm.startsWith('@');
+          const cleanTerm = searchTerm.replace(/@/g, '');
+          const encodedTerm = encodeURIComponent(cleanTerm);
           
-    //       const twitterUrl = isUser 
-    //         ? `https://twitter.com/${encodedTerm}`
-    //         : `https://twitter.com/search?q=${encodedTerm}`;
+          const twitterUrl = isUser 
+            ? `https://twitter.com/${encodedTerm}`
+            : `https://twitter.com/search?q=${encodedTerm}`;
           
-    //       const canOpen = await Linking.canOpenURL(twitterUrl);
-    //       if (canOpen) {
-    //         await Linking.openURL(twitterUrl);
-    //         return true;
-    //       }
-    //     } else {
-    //       try {
-    //         await Linking.openURL('twitter://');
-    //         return true;
-    //       } catch {
-    //         await Linking.openURL('https://twitter.com');
-    //         return true;
-    //       }
-    //     }
-    //     return false;
-    //   }
-    // },
+          const canOpen = await Linking.canOpenURL(twitterUrl);
+          if (canOpen) {
+            await Linking.openURL(twitterUrl);
+            return true;
+          }
+        } else {
+          try {
+            await Linking.openURL('twitter://');
+            return true;
+          } catch {
+            await Linking.openURL('https://twitter.com');
+            return true;
+          }
+        }
+        return false;
+      }
+    },
 
     // // Social Media - WhatsApp
-    // {
-    //   name: 'Open WhatsApp',
-    //   description: 'Open WhatsApp or send message to contact',
-    //   keywords: ['whatsapp', 'whats app', 'wa', 'message on whatsapp'],
-    //   execute: async (query: string) => {
-    //     const phoneMatch = query.match(/whatsapp\s+(\+?\d[\d\s\-()]+)/i);
-    //     const phoneNumber = phoneMatch ? phoneMatch[1].replace(/[^\d+]/g, '') : null;
+    {
+      name: 'Open WhatsApp',
+      description: 'Open WhatsApp or send message to contact',
+      keywords: ['whatsapp', 'whats app', 'wa', 'message on whatsapp'],
+      execute: async (query: string) => {
+        const phoneMatch = query.match(/whatsapp\s+(\+?\d[\d\s\-()]+)/i);
+        const phoneNumber = phoneMatch ? phoneMatch[1].replace(/[^\d+]/g, '') : null;
         
-    //     if (phoneNumber) {
-    //       const whatsappUrl = `whatsapp://send?phone=${phoneNumber}`;
-    //       try {
-    //         const canOpen = await Linking.canOpenURL(whatsappUrl);
-    //         if (canOpen) {
-    //           await Linking.openURL(whatsappUrl);
-    //           return true;
-    //         }
-    //       } catch {
-    //         const webUrl = `https://wa.me/${phoneNumber}`;
-    //         await Linking.openURL(webUrl);
-    //         return true;
-    //       }
-    //     } else {
-    //       try {
-    //         await Linking.openURL('whatsapp://');
-    //         return true;
-    //       } catch {
-    //         await Linking.openURL('https://web.whatsapp.com');
-    //         return true;
-    //       }
-    //     }
-    //     return false;
-    //   }
-    // },
+        if (phoneNumber) {
+          const whatsappUrl = `whatsapp://send?phone=${phoneNumber}`;
+          try {
+            const canOpen = await Linking.canOpenURL(whatsappUrl);
+            if (canOpen) {
+              await Linking.openURL(whatsappUrl);
+              return true;
+            }
+          } catch {
+            const webUrl = `https://wa.me/${phoneNumber}`;
+            await Linking.openURL(webUrl);
+            return true;
+          }
+        } else {
+          try {
+            await Linking.openURL('whatsapp://');
+            return true;
+          } catch {
+            await Linking.openURL('https://web.whatsapp.com');
+            return true;
+          }
+        }
+        return false;
+      }
+    },
 
     // // Social Media - TikTok
     // {
@@ -497,41 +497,41 @@ export class DeepLinkingService {
     // },
 
     // // Transportation - Uber
-    // {
-    //   name: 'Book Uber',
-    //   description: 'Open Uber app to book a ride',
-    //   keywords: ['uber', 'ride', 'taxi', 'cab', 'book ride'],
-    //   execute: async (query: string) => {
-    //     const destinationMatch = query.match(/(?:uber|ride|taxi|cab)\s+(?:to\s+)?(.+)/i);
-    //     const destination = destinationMatch ? destinationMatch[1].trim() : '';
+    {
+      name: 'Book Uber',
+      description: 'Open Uber app to book a ride',
+      keywords: ['uber', 'ride', 'taxi', 'cab', 'book ride'],
+      execute: async (query: string) => {
+        const destinationMatch = query.match(/(?:uber|ride|taxi|cab)\s+(?:to\s+)?(.+)/i);
+        const destination = destinationMatch ? destinationMatch[1].trim() : '';
         
-    //     if (destination) {
-    //       const encodedDestination = encodeURIComponent(destination);
-    //       const uberUrl = `uber://?action=setPickup&pickup=my_location&dropoff[formatted_address]=${encodedDestination}`;
+        if (destination) {
+          const encodedDestination = encodeURIComponent(destination);
+          const uberUrl = `uber://?action=setPickup&pickup=my_location&dropoff[formatted_address]=${encodedDestination}`;
           
-    //       try {
-    //         const canOpen = await Linking.canOpenURL(uberUrl);
-    //         if (canOpen) {
-    //           await Linking.openURL(uberUrl);
-    //           return true;
-    //         }
-    //       } catch {
-    //         const webUrl = `https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[formatted_address]=${encodedDestination}`;
-    //         await Linking.openURL(webUrl);
-    //         return true;
-    //       }
-    //     } else {
-    //       try {
-    //         await Linking.openURL('uber://');
-    //         return true;
-    //       } catch {
-    //         await Linking.openURL('https://uber.com');
-    //         return true;
-    //       }
-    //     }
-    //     return false;
-    //   }
-    // },
+          try {
+            const canOpen = await Linking.canOpenURL(uberUrl);
+            if (canOpen) {
+              await Linking.openURL(uberUrl);
+              return true;
+            }
+          } catch {
+            const webUrl = `https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[formatted_address]=${encodedDestination}`;
+            await Linking.openURL(webUrl);
+            return true;
+          }
+        } else {
+          try {
+            await Linking.openURL('uber://');
+            return true;
+          } catch {
+            await Linking.openURL('https://uber.com');
+            return true;
+          }
+        }
+        return false;
+      }
+    },
 
     // // Shopping - Flipkart (Popular in India)
     // {

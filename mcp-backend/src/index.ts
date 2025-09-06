@@ -70,6 +70,7 @@ app.use(cors({
     'Content-Type', 
     'Authorization', 
     'X-Requested-With',
+    'x-user-context',
     'Accept',
     'x-timezone',
     'Origin'

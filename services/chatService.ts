@@ -7,6 +7,7 @@ import { StreamingService, StreamingCallbacks } from './streamingService';
 import { DeepLinkingService } from './deepLinkingService';
 import { UserProfileService } from './userProfileService';
 import { PreferencesDebugger } from './preferencesDebugger';
+import { NameDebugger } from './nameDebugger';
 
 export class ChatService {
   private static responseCache = new Map<string, any>();
@@ -271,6 +272,94 @@ export class ChatService {
               'assistant',
               `❌ **Auto-fix Failed:** ${error instanceof Error ? error.message : 'Unknown error'}`,
               { error: true, toolName: 'preferencesFix' }
+            ));
+          }
+          break;
+          
+        case '/debug-name':
+          responses.push(this.createMessage('system', 'Debugging name detection...', { loading: true }));
+          try {
+            console.log('🔍 Starting name debug...');
+            await NameDebugger.debugNameDetection();
+            
+            const nameStatus = await NameDebugger.getNameStatus();
+            
+            let report = '🔍 **Name Detection Debug Report**\n\n';
+            report += `**Backend Name:** ${nameStatus.backendName ? `✅ "${nameStatus.backendName}"` : '❌ Not found'}\n`;
+            report += `**Local Profile Name:** ${nameStatus.localName ? `✅ "${nameStatus.localName}"` : '❌ Not found'}\n`;
+            report += `**Greeting Uses Name:** ${nameStatus.greetingHasName ? '✅ Yes' : '❌ No'}\n`;
+            report += `**Name Query Works:** ${nameStatus.nameQueryWorks ? '✅ Yes' : '❌ No'}\n\n`;
+            
+            if (!nameStatus.backendName && !nameStatus.localName) {
+              report += '**Issue Found:** No name in profile\n';
+              report += '**Solution:** Please set your name in Settings > Preferences\n\n';
+            } else if (nameStatus.backendName && !nameStatus.greetingHasName) {
+              report += '**Issue Found:** Name exists but not used in responses\n';
+              report += '**Solution:** Check response generation logic\n\n';
+            } else if (nameStatus.localName) {
+              report += '**Status:** Name setup looks good! ✅\n\n';
+            }
+            
+            report += '**Next Steps:**\n';
+            report += '• Check browser console for detailed logs\n';
+            report += '• Try `/test-name YourName` to test with a sample name\n';
+            report += '• Use `/preferences` to see all your profile data\n';
+            
+            responses.push(this.createMessage(
+              'assistant',
+              report,
+              { toolName: 'nameDebug', toolData: nameStatus }
+            ));
+          } catch (error) {
+            responses.push(this.createMessage(
+              'assistant',
+              `❌ **Name Debug Failed:** ${error instanceof Error ? error.message : 'Unknown error'}\n\nCheck browser console for details.`,
+              { error: true, toolName: 'nameDebug' }
+            ));
+          }
+          break;
+          
+        case '/test-name':
+          const testName = userMessage.slice(10).trim();
+          if (!testName) {
+            responses.push(this.createMessage('assistant', 'Please specify a name to test with. Example: /test-name Alex', { error: true }));
+            break;
+          }
+          
+          responses.push(this.createMessage('system', `Testing name setting with "${testName}"...`, { loading: true }));
+          try {
+            await NameDebugger.testNameSetting(testName);
+            
+            // Test the results
+            const greeting = await UserProfileService.getPersonalizedGreeting();
+            const nameQuery = await UserProfileService.handlePreferenceQuery('What is my name?');
+            
+            let testReport = `🧪 **Name Test Results for "${testName}"**\n\n`;
+            testReport += `**Updated Greeting:**\n"${greeting}"\n\n`;
+            testReport += `**Name Query Response:**\n"${nameQuery}"\n\n`;
+            
+            if (greeting.includes(testName)) {
+              testReport += '✅ **Success!** Name is now being used in greetings.\n';
+            } else {
+              testReport += '❌ **Issue:** Name not appearing in greetings.\n';
+            }
+            
+            if (nameQuery && nameQuery.includes(testName)) {
+              testReport += '✅ **Success!** Name queries are working.\n';
+            } else {
+              testReport += '❌ **Issue:** Name queries not working properly.\n';
+            }
+            
+            responses.push(this.createMessage(
+              'assistant',
+              testReport,
+              { toolName: 'nameTest', toolData: { testName, greeting, nameQuery } }
+            ));
+          } catch (error) {
+            responses.push(this.createMessage(
+              'assistant',
+              `❌ **Name Test Failed:** ${error instanceof Error ? error.message : 'Unknown error'}`,
+              { error: true, toolName: 'nameTest' }
             ));
           }
           break;
@@ -543,7 +632,9 @@ export class ChatService {
     helpText += "• `/preferences hobbies` - See your hobbies\n";
     helpText += "• `/profile profession` - Check your work info\n";
     helpText += "• `/debug-preferences` - Debug personalization system issues\n";
-    helpText += "• `/fix-preferences` - Auto-fix common preference problems\n\n";
+    helpText += "• `/fix-preferences` - Auto-fix common preference problems\n";
+    helpText += "• `/debug-name` - Debug name detection specifically\n";
+    helpText += "• `/test-name YourName` - Test name setting with a sample name\n\n";
     
     helpText += "🤖 **Natural Language Queries:**\n";
     helpText += "You can ask me anything naturally! Try:\n\n";

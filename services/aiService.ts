@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { UserProfileService } from './userProfileService';
+import { UserContextService, CompleteUserContext } from './userContextService';
 
 const MCP_BASE_URL = 'http://localhost:3001/api';
 
@@ -10,6 +11,8 @@ interface AIQueryRequest {
     responseStyle?: 'brief' | 'detailed' | 'conversational';
     includeActions?: boolean;
   };
+  // Enhanced with complete user context
+  completeUserContext?: CompleteUserContext;
 }
 
 interface AIQueryResponse {
@@ -45,47 +48,86 @@ interface AvailableToolsResponse {
 
 export class AIService {
   /**
-   * Process a natural language query using AI with conversation context and personalization
+   * Process a natural language query using AI with complete user context (always fresh)
    */
   static async processQuery(request: AIQueryRequest): Promise<AIQueryResponse> {
     try {
-      // Check if this is a preference-related query first
+      console.log('🚀 Processing AI query with complete user context...');
+      
+      // STEP 1: Always fetch fresh, complete user context
+      const completeContext = await UserContextService.getCompleteUserContext();
+      
+      if (completeContext) {
+        console.log('✅ Complete user context loaded:');
+        console.log(UserContextService.getContextSummary(completeContext));
+      } else {
+        console.log('⚠️ No complete user context available');
+      }
+
+      // STEP 2: Check if this is a preference-related query first (with full context)
       const preferenceResponse = await UserProfileService.handlePreferenceQuery(request.query);
       if (preferenceResponse) {
+        // Even preference queries get the user's name from context if available
+        let enhancedResponse = preferenceResponse;
+        if (completeContext) {
+          const displayName = await UserContextService.getUserDisplayName();
+          if (displayName !== 'friend' && !enhancedResponse.includes(displayName)) {
+            // Add personalized touch if not already present
+            enhancedResponse = enhancedResponse.replace(/^(Hey[^!]*!)/, `Hey ${displayName}!`);
+          }
+        }
+
         return {
           success: true,
           data: {
             query: request.query,
-            response: preferenceResponse,
+            response: enhancedResponse,
             toolUsed: 'userProfile',
-            reasoning: 'Retrieved information from user preferences'
+            reasoning: 'Retrieved information from user preferences with complete context'
           },
           timestamp: new Date().toISOString()
         };
       }
 
+      // STEP 3: Prepare session and authentication
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error('No active session');
       }
 
-      // Build personalized context
-      const personalizedContext = await UserProfileService.buildPersonalizedContext();
-      const styleInstructions = await UserProfileService.getConversationStyleInstructions();
-
-      // Enhance the request with personalization
+      // STEP 4: Build enhanced request with complete user context
       const enhancedRequest = {
         ...request,
-        personalization: personalizedContext,
-        styleInstructions: styleInstructions || undefined
+        completeUserContext: completeContext,
+        // Legacy support - still include old personalization for backend compatibility
+        personalization: completeContext ? {
+          userPreferences: completeContext.profile,
+          currentContext: completeContext.context,
+          googleAccount: completeContext.googleAccount
+        } : undefined,
+        // Add style instructions
+        styleInstructions: completeContext?.profile 
+          ? await UserProfileService.getConversationStyleInstructions()
+          : undefined
       };
 
+      console.log('📤 Sending enhanced request to backend with complete context');
+      console.log('🔍 Complete context summary:', completeContext ? {
+        hasGoogleAccount: !!completeContext.googleAccount,
+        googleName: completeContext.googleAccount?.name,
+        googleEmail: completeContext.googleAccount?.email,
+        hasProfile: !!completeContext.profile,
+        profileName: completeContext.profile?.personalInfo?.name
+      } : 'No complete context');
+
+      // STEP 5: Send to backend AI service
       const response = await fetch(`${MCP_BASE_URL}/ai/query`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
           'X-Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone,
+          'X-User-Context': completeContext ? 'complete' : 'limited',
         },
         body: JSON.stringify(enhancedRequest),
       });
@@ -96,8 +138,9 @@ export class AIService {
       }
 
       const result = await response.json();
+      console.log('✅ AI response received with complete user context');
 
-      // Update conversation context with topics if successful
+      // STEP 6: Update conversation context with topics if successful
       if (result.success && result.data) {
         await this.updateConversationTopics(request.query, result.data.response);
       }

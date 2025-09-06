@@ -54,10 +54,38 @@ export interface UserContext {
   personalization?: {
     userPreferences: any; // User's complete preference data
     onboardingCompleted: boolean;
+    googleAccount?: {
+      name: string | null;
+      email: string | null;
+      avatar_url: string | null;
+    };
     currentContext: {
       timeOfDay: string;
       dayOfWeek: string;
       timestamp: string;
+      timezone: string;
+    };
+  };
+  // Enhanced complete user context
+  completeUserContext?: {
+    googleAccount: {
+      name: string | null;
+      email: string | null;
+      avatar_url: string | null;
+      id: string | null;
+    };
+    profile: any; // UserPersonalizationData
+    session: {
+      user_id: string;
+      created_at: string;
+      last_sign_in_at: string | null;
+    };
+    context: {
+      fetched_at: string;
+      timezone: string;
+      current_time: string;
+      day_of_week: string;
+      time_of_day: string;
     };
   };
 }

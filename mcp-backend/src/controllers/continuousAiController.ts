@@ -144,7 +144,7 @@ export class ContinuousAIController {
         status: 'completed'
       });
 
-      if (complexityAnalysis.isComplex && complexityAnalysis.shouldUseImplementationPlan) {
+      if (complexityAnalysis.complexity === 'complex') {
         // Use implementation plan for complex tasks
         callback({
           type: 'implementation_plan_selected',

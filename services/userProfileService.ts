@@ -459,13 +459,19 @@ export class UserProfileService {
       return `Hey${friendlyName}! I don't have any information about your preferences yet. Let's get your profile set up so I can assist you better! You can do this in your profile settings.`;
     }
 
-    // Personal Information Queries
+    // Personal Information Queries  
     if (lowerQuery.includes('hobby') || lowerQuery.includes('hobbies')) {
       const hobbies = profile.personalInfo?.hobbies;
       if (hobbies && hobbies.length > 0) {
-        return `${name ? `${name}, your` : 'Your'} hobbies include: ${hobbies.join(', ')}! ${this.getActivityRelatedSuggestion(hobbies, 'hobbies')}`;
+        let response = `${name ? `Hey ${name}! 🎨` : 'Hey there! 🎨'}\n\n`;
+        response += `**Your Hobbies:**\n`;
+        hobbies.forEach((hobby, index) => {
+          response += `${index + 1}. **${hobby}** ✨\n`;
+        });
+        response += `\n${this.getActivityRelatedSuggestion(hobbies, 'hobbies')}`;
+        return response;
       }
-      return `${name ? `${name}, you` : 'You'} haven't listed any hobbies yet. I'd love to know what you enjoy doing in your free time!`;
+      return `${name ? `${name}, I` : 'I'} don't see any hobbies in your profile yet! 🤔\n\n**Tell me:** What do you love doing in your free time? I'd be excited to learn more about your interests and help you with them! 🌟`;
     }
 
     if (lowerQuery.includes('profession') || lowerQuery.includes('job') || lowerQuery.includes('work') || lowerQuery.includes('career')) {
@@ -474,21 +480,22 @@ export class UserProfileService {
       const experience = profile.personalInfo?.experience_level;
       
       if (profession) {
-        let response = `${name ? `${name}, you` : 'You'} work as a ${profession}${industry ? ` in the ${industry} industry` : ''}`;
-        if (experience) {
-          response += ` with ${experience} level experience`;
-        }
-        response += `. ${this.getWorkRelatedSuggestion(profession, industry)}`;
+        let response = `${name ? `${name}! 💼` : 'Hey! 💼'}\n\n`;
+        response += `**Your Career:**\n`;
+        response += `• **Role:** ${profession}\n`;
+        if (industry) response += `• **Industry:** ${industry}\n`;
+        if (experience) response += `• **Experience Level:** ${experience}\n`;
+        response += `\n${this.getWorkRelatedSuggestion(profession, industry)}`;
         return response;
       }
-      return `I don't have your work information yet${friendlyName}. What do you do for work? I'd love to learn more about your career!`;
+      return `${name ? `${name}, I'd` : 'I\'d'} love to know more about your career! 🚀\n\n**Tell me:** What do you do for work? Whether you're just starting out or you're a seasoned pro, I'm here to help with anything work-related! 💪`;
     }
 
     if (lowerQuery.includes('name') || lowerQuery.includes('who am i') || lowerQuery.includes('my name')) {
       if (name) {
-        return `Your name is ${name}! Nice to meet you properly. 😊`;
+        return `Hi there! 👋\n\n**Your Name:** ${name}\n\nIt's so nice to know what to call you! I love having that personal connection. Makes our conversations feel much more friendly, don't you think? 😊`;
       }
-      return "You haven't told me your name yet! I'd love to know what to call you.";
+      return `Hey! 👋\n\n**Your Name:** *Not set yet*\n\nI'd absolutely love to know what to call you! Having your name makes our chats feel so much more personal and friendly. 😊\n\n**Want to tell me?** Just let me know your name and I'll remember it for all our future conversations! ✨`;
     }
 
     // Interests and Learning
@@ -497,20 +504,29 @@ export class UserProfileService {
       const currentAffairs = profile.contentPreferences?.current_affairs_interests;
       const learningStyle = profile.contentPreferences?.learning_style;
       
-      let response = '';
       if (interests && interests.length > 0) {
-        response += `${name ? `${name}, your` : 'Your'} main interests are: ${interests.join(', ')}`;
+        let response = `${name ? `${name}! 🎯` : 'Hey! 🎯'}\n\n`;
+        response += `**Your Main Interests:**\n`;
+        interests.forEach((interest, index) => {
+          response += `${index + 1}. **${interest}** 💫\n`;
+        });
+        
         if (currentAffairs && currentAffairs.length > 0) {
-          response += `. You also follow: ${currentAffairs.join(', ')}`;
+          response += `\n**You Also Follow:**\n`;
+          currentAffairs.forEach((topic, index) => {
+            response += `• ${topic}\n`;
+          });
         }
+        
         if (learningStyle) {
-          response += `. I notice you're a ${learningStyle} learner, so I'll keep that in mind when explaining things!`;
+          response += `\n**Learning Style:** ${learningStyle} learner 📚\n\n*I'll keep this in mind when explaining things to you!*`;
         }
-        response += ` ${this.getInterestRelatedSuggestion(interests)}`;
+        
+        response += `\n\n${this.getInterestRelatedSuggestion(interests)}`;
+        return response;
       } else {
-        response = `I'd love to know more about your interests${friendlyName}! What topics fascinate you?`;
+        return `${name ? `${name}, I'm` : 'I\'m'} curious about what fascinates you! 🤔✨\n\n**Tell me:** What topics, subjects, or areas really capture your interest? Whether it's technology, arts, science, sports, or anything else - I'd love to learn about what makes you excited! 🌟\n\n*The more I know about your interests, the better I can tailor my help just for you!*`;
       }
-      return response;
     }
 
     // Communication and Personality Preferences
@@ -519,20 +535,23 @@ export class UserProfileService {
       const behavior = profile.assistantBehavior;
       
       if (style) {
-        let response = `${name ? `Perfect question, ${name}! ` : ''}Here's how you like me to communicate: `;
-        response += `I use a ${style.tone} tone with ${style.detail_level} explanations`;
+        let response = `${name ? `Perfect question, ${name}! 💬` : 'Great question! 💬'}\n\n`;
+        response += `**How You Like Me to Communicate:**\n\n`;
+        response += `• **Tone:** ${style.tone} 🎭\n`;
+        response += `• **Detail Level:** ${style.detail_level} explanations 📊\n`;
+        response += `• **Response Length:** ${style.response_length} responses 📝\n`;
         
-        if (style.use_analogies) response += `, and you love analogies`;
-        if (style.include_examples) response += ` and practical examples`;
+        if (style.use_analogies) response += `• **Analogies:** Yes, you love them! 📚\n`;
+        if (style.include_examples) response += `• **Examples:** Always include practical ones 💡\n`;
         
         if (behavior?.personality) {
-          response += `. You've set my personality to be ${behavior.personality}`;
+          response += `• **My Personality:** ${behavior.personality} 🤖\n`;
         }
         
-        response += `. This helps me tailor my responses just for you!`;
+        response += `\n*This helps me tailor every single response just for you! I love having these guidelines to make our conversations perfect.* ✨`;
         return response;
       }
-      return `I'd love to know how you prefer me to communicate with you${friendlyName}! Should I be more casual, professional, or somewhere in between?`;
+      return `${name ? `${name}, I'd` : 'I\'d'} love to know your communication preferences! 💭\n\n**Tell me:** How do you like me to talk with you?\n\n• Should I be casual and friendly? 😊\n• More professional and structured? 💼\n• Enthusiastic and energetic? 🎉\n• Something else entirely?\n\n*The more you tell me, the better I can match your style!*`;
     }
 
     // Work Preferences and Productivity
@@ -747,94 +766,151 @@ export class UserProfileService {
 
   private static getComprehensivePreferenceSummary(profile: UserPersonalizationData): string {
     const name = profile.personalInfo?.name;
-    const friendlyName = name ? `, ${name}` : '';
     
-    let summary = `${name ? `${name}, here's` : 'Here\'s'} everything I know about you! 😊\n\n`;
+    let summary = `${name ? `Hey ${name}! 🌟` : 'Hey there! 🌟'}\n\n`;
+    summary += `**Here's everything I know about you:**\n\n`;
+    summary += `*I love having all these details - it helps me be the best assistant possible for you!* ✨\n\n`;
+    summary += `---\n\n`;
     
     // Personal Information
-    if (profile.personalInfo) {
-      summary += '👤 **Personal Info:**\n';
-      const personal = [];
-      if (profile.personalInfo.name) personal.push(`Name: ${profile.personalInfo.name}`);
-      if (profile.personalInfo.profession) {
-        personal.push(`Work: ${profile.personalInfo.profession}${profile.personalInfo.industry ? ` in ${profile.personalInfo.industry}` : ''}`);
-      }
-      if (profile.personalInfo.experience_level) personal.push(`Experience: ${profile.personalInfo.experience_level}`);
-      if (profile.personalInfo.hobbies && profile.personalInfo.hobbies.length > 0) {
-        personal.push(`Hobbies: ${profile.personalInfo.hobbies.join(', ')}`);
-      }
-      if (profile.personalInfo.time_zone) personal.push(`Timezone: ${profile.personalInfo.time_zone}`);
+    if (profile.personalInfo && Object.values(profile.personalInfo).some(v => v)) {
+      summary += '👤 **Personal Information**\n\n';
       
-      if (personal.length > 0) {
-        summary += personal.map(p => `• ${p}`).join('\n') + '\n\n';
+      if (profile.personalInfo.name) {
+        summary += `• **Name:** ${profile.personalInfo.name} 💫\n`;
       }
+      
+      if (profile.personalInfo.profession) {
+        summary += `• **Profession:** ${profile.personalInfo.profession}`;
+        if (profile.personalInfo.industry) summary += ` (${profile.personalInfo.industry} industry)`;
+        summary += ` 💼\n`;
+      }
+      
+      if (profile.personalInfo.experience_level) {
+        summary += `• **Experience Level:** ${profile.personalInfo.experience_level} 📈\n`;
+      }
+      
+      if (profile.personalInfo.hobbies && profile.personalInfo.hobbies.length > 0) {
+        summary += `• **Hobbies:** ${profile.personalInfo.hobbies.join(', ')} 🎨\n`;
+      }
+      
+      if (profile.personalInfo.time_zone) {
+        summary += `• **Timezone:** ${profile.personalInfo.time_zone} 🌍\n`;
+      }
+      
+      summary += '\n';
     }
     
     // Communication Style
     if (profile.communicationStyle) {
-      summary += '💬 **How You Like Me to Communicate:**\n';
-      const comm = [];
-      comm.push(`Tone: ${profile.communicationStyle.tone}`);
-      comm.push(`Detail level: ${profile.communicationStyle.detail_level}`);
-      comm.push(`Response length: ${profile.communicationStyle.response_length}`);
-      if (profile.communicationStyle.use_analogies) comm.push('You love analogies! 📚');
-      if (profile.communicationStyle.include_examples) comm.push('You want practical examples');
+      summary += '💬 **Communication Preferences**\n\n';
+      summary += `• **Tone:** ${profile.communicationStyle.tone} 🎭\n`;
+      summary += `• **Detail Level:** ${profile.communicationStyle.detail_level} explanations 📊\n`;
+      summary += `• **Response Length:** ${profile.communicationStyle.response_length} responses 📝\n`;
       
-      summary += comm.map(c => `• ${c}`).join('\n') + '\n\n';
+      if (profile.communicationStyle.use_analogies) {
+        summary += `• **Analogies:** You love them! Perfect for explaining complex stuff 📚\n`;
+      }
+      
+      if (profile.communicationStyle.include_examples) {
+        summary += `• **Examples:** Always include practical ones 💡\n`;
+      }
+      
+      summary += '\n';
     }
     
     // Interests
     if (profile.contentPreferences?.primary_interests && profile.contentPreferences.primary_interests.length > 0) {
-      summary += '🎯 **Your Interests:**\n';
-      summary += `• ${profile.contentPreferences.primary_interests.join(', ')}\n`;
+      summary += '🎯 **Your Interests & Learning**\n\n';
+      
+      summary += `• **Main Topics:** `;
+      profile.contentPreferences.primary_interests.forEach((interest, index) => {
+        summary += `**${interest}**`;
+        if (index < profile.contentPreferences.primary_interests.length - 1) summary += ', ';
+      });
+      summary += ` 💫\n`;
       
       if (profile.contentPreferences.current_affairs_interests && profile.contentPreferences.current_affairs_interests.length > 0) {
-        summary += `• Current affairs: ${profile.contentPreferences.current_affairs_interests.join(', ')}\n`;
+        summary += `• **Current Affairs:** ${profile.contentPreferences.current_affairs_interests.join(', ')} 📰\n`;
       }
+      
       if (profile.contentPreferences.learning_style) {
-        summary += `• Learning style: ${profile.contentPreferences.learning_style}\n`;
+        summary += `• **Learning Style:** ${profile.contentPreferences.learning_style} learner 🧠\n`;
       }
+      
       summary += '\n';
     }
     
     // Work Preferences
     if (profile.workPreferences && Object.values(profile.workPreferences).some(v => v)) {
-      summary += '💼 **Work Style:**\n';
-      const work = [];
-      if (profile.workPreferences.work_schedule) work.push(`Most productive: ${profile.workPreferences.work_schedule}`);
-      if (profile.workPreferences.productivity_style) work.push(`Style: ${profile.workPreferences.productivity_style.replace('_', ' ')}`);
-      if (profile.workPreferences.meeting_preferences) work.push(`Meetings: ${profile.workPreferences.meeting_preferences}`);
+      summary += '💼 **Work & Productivity Style**\n\n';
       
-      if (work.length > 0) {
-        summary += work.map(w => `• ${w}`).join('\n') + '\n\n';
+      if (profile.workPreferences.work_schedule) {
+        summary += `• **Most Productive:** ${profile.workPreferences.work_schedule} ⏰\n`;
       }
+      
+      if (profile.workPreferences.productivity_style) {
+        summary += `• **Work Style:** ${profile.workPreferences.productivity_style.replace('_', ' ')} 🎯\n`;
+      }
+      
+      if (profile.workPreferences.meeting_preferences) {
+        summary += `• **Meeting Style:** ${profile.workPreferences.meeting_preferences} meetings 🤝\n`;
+      }
+      
+      if (profile.workPreferences.priority_framework) {
+        summary += `• **Prioritization:** ${profile.workPreferences.priority_framework.replace('_', ' ')} approach 📋\n`;
+      }
+      
+      summary += '\n';
     }
     
     // Technology Stack
     if (profile.domainPreferences?.tech_stack && profile.domainPreferences.tech_stack.length > 0) {
-      summary += '💻 **Tech Stack:**\n';
-      summary += `• ${profile.domainPreferences.tech_stack.join(', ')}\n`;
+      summary += '💻 **Technology & Coding**\n\n';
+      summary += `• **Tech Stack:** `;
+      profile.domainPreferences.tech_stack.forEach((tech, index) => {
+        summary += `**${tech}**`;
+        if (index < profile.domainPreferences.tech_stack.length - 1) summary += ', ';
+      });
+      summary += ` 🚀\n`;
+      
       if (profile.domainPreferences.coding_style) {
-        summary += `• Coding style: ${profile.domainPreferences.coding_style}\n`;
+        summary += `• **Coding Style:** ${profile.domainPreferences.coding_style} code 💻\n`;
       }
+      
+      if (profile.domainPreferences.documentation_preference) {
+        summary += `• **Documentation:** ${profile.domainPreferences.documentation_preference.replace('_', ' ')} style 📚\n`;
+      }
+      
       summary += '\n';
     }
     
     // Assistant Behavior
     if (profile.assistantBehavior) {
-      summary += '🤖 **My Personality for You:**\n';
-      const behavior = [];
-      if (profile.assistantBehavior.personality) behavior.push(`I'm ${profile.assistantBehavior.personality}`);
-      if (profile.assistantBehavior.proactivity_level) behavior.push(`Proactivity: ${profile.assistantBehavior.proactivity_level}`);
-      if (profile.assistantBehavior.follow_up_questions) behavior.push('I ask follow-up questions');
-      if (profile.assistantBehavior.suggest_related_topics) behavior.push('I suggest related topics');
+      summary += '🤖 **How I Act With You**\n\n';
       
-      if (behavior.length > 0) {
-        summary += behavior.map(b => `• ${b}`).join('\n') + '\n\n';
+      if (profile.assistantBehavior.personality) {
+        summary += `• **My Personality:** ${profile.assistantBehavior.personality} 😊\n`;
       }
+      
+      if (profile.assistantBehavior.proactivity_level) {
+        summary += `• **Proactivity:** ${profile.assistantBehavior.proactivity_level} 💡\n`;
+      }
+      
+      if (profile.assistantBehavior.follow_up_questions) {
+        summary += `• **Follow-up Questions:** I ask them to help better 🤔\n`;
+      }
+      
+      if (profile.assistantBehavior.suggest_related_topics) {
+        summary += `• **Topic Suggestions:** I suggest related ideas 💭\n`;
+      }
+      
+      summary += '\n';
     }
     
-    summary += `This helps me tailor every conversation just for you${friendlyName}! Want to update any of these in your settings? 🎨`;
+    summary += `---\n\n`;
+    summary += `${name ? `${name}, this` : 'This'} is how I tailor every single conversation just for you! 🎯\n\n`;
+    summary += `**Want to update anything?** Just let me know or head to your settings! I'm always excited to learn more about you. 🌟`;
     
     return summary;
   }
