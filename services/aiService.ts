@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { UserProfileService } from './userProfileService';
 
 const MCP_BASE_URL = 'http://localhost:3001/api';
 
@@ -44,14 +45,40 @@ interface AvailableToolsResponse {
 
 export class AIService {
   /**
-   * Process a natural language query using AI with conversation context
+   * Process a natural language query using AI with conversation context and personalization
    */
   static async processQuery(request: AIQueryRequest): Promise<AIQueryResponse> {
     try {
+      // Check if this is a preference-related query first
+      const preferenceResponse = await UserProfileService.handlePreferenceQuery(request.query);
+      if (preferenceResponse) {
+        return {
+          success: true,
+          data: {
+            query: request.query,
+            response: preferenceResponse,
+            toolUsed: 'userProfile',
+            reasoning: 'Retrieved information from user preferences'
+          },
+          timestamp: new Date().toISOString()
+        };
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error('No active session');
       }
+
+      // Build personalized context
+      const personalizedContext = await UserProfileService.buildPersonalizedContext();
+      const styleInstructions = await UserProfileService.getConversationStyleInstructions();
+
+      // Enhance the request with personalization
+      const enhancedRequest = {
+        ...request,
+        personalization: personalizedContext,
+        styleInstructions: styleInstructions || undefined
+      };
 
       const response = await fetch(`${MCP_BASE_URL}/ai/query`, {
         method: 'POST',
@@ -60,7 +87,7 @@ export class AIService {
           'Content-Type': 'application/json',
           'X-Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone,
         },
-        body: JSON.stringify(request),
+        body: JSON.stringify(enhancedRequest),
       });
 
       if (!response.ok) {
@@ -68,7 +95,14 @@ export class AIService {
         throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
-      return await response.json();
+      const result = await response.json();
+
+      // Update conversation context with topics if successful
+      if (result.success && result.data) {
+        await this.updateConversationTopics(request.query, result.data.response);
+      }
+
+      return result;
     } catch (error) {
       console.error('❌ AI query error:', error);
       throw error;
@@ -214,5 +248,46 @@ export class AIService {
         timestamp: new Date().toISOString()
       };
     }
+  }
+
+  /**
+   * Update conversation topics for better context tracking
+   */
+  private static async updateConversationTopics(query: string, response: string): Promise<void> {
+    try {
+      // Extract topics from query and response
+      const topics = this.extractTopics(query + ' ' + response);
+      await UserProfileService.updateConversationContext(topics);
+    } catch (error) {
+      console.error('Error updating conversation context:', error);
+    }
+  }
+
+  /**
+   * Simple topic extraction from text
+   */
+  private static extractTopics(text: string): string[] {
+    const keywords = text
+      .toLowerCase()
+      .split(/\W+/)
+      .filter(word => word.length > 3 && !this.isStopWord(word))
+      .slice(0, 10); // Keep top 10 keywords
+
+    return [...new Set(keywords)]; // Remove duplicates
+  }
+
+  /**
+   * Check if word is a stop word
+   */
+  private static isStopWord(word: string): boolean {
+    const stopWords = ['that', 'with', 'have', 'this', 'will', 'your', 'from', 'they', 'know', 'want', 'been', 'good', 'much', 'some', 'time'];
+    return stopWords.includes(word);
+  }
+
+  /**
+   * Get personalized greeting
+   */
+  static async getPersonalizedGreeting(): Promise<string> {
+    return await UserProfileService.getPersonalizedGreeting();
   }
 }

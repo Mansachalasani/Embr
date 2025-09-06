@@ -5,6 +5,8 @@ import { TokenDebugger } from './debugTokens';
 import { AIService } from './aiService';
 import { StreamingService, StreamingCallbacks } from './streamingService';
 import { DeepLinkingService } from './deepLinkingService';
+import { UserProfileService } from './userProfileService';
+import { PreferencesDebugger } from './preferencesDebugger';
 
 export class ChatService {
   private static responseCache = new Map<string, any>();
@@ -153,7 +155,7 @@ export class ChatService {
       
       switch (command) {
         case '/help':
-          responses.push(this.createMessage('assistant', this.getHelpMessage()));
+          responses.push(this.createMessage('assistant', await this.getHelpMessage()));
           break;
           
         case '/calendar':
@@ -200,6 +202,77 @@ export class ChatService {
               toolData: debugResult.details
             }
           ));
+          break;
+          
+        case '/debug-preferences':
+          responses.push(this.createMessage('system', 'Running preferences debug...', { loading: true }));
+          try {
+            console.log('🔍 Starting preferences debug...');
+            await PreferencesDebugger.debugPreferencesFlow();
+            
+            const status = await PreferencesDebugger.quickStatus();
+            
+            let statusReport = '🔍 **Preferences Debug Report**\n\n';
+            statusReport += `**Backend Preferences:** ${status.backendPreferences ? '✅ Found' : '❌ Missing'}\n`;
+            statusReport += `**Local Profile:** ${status.localProfile ? '✅ Cached' : '❌ Empty'}\n`;
+            statusReport += `**Onboarding:** ${status.onboardingCompleted ? '✅ Completed' : '❌ Incomplete'}\n`;
+            statusReport += `**Personalized Greeting:** ${status.personalizedGreeting ? '✅ Working' : '❌ Not working'}\n\n`;
+            
+            if (!status.backendPreferences) {
+              statusReport += '**Issues Found:**\n';
+              statusReport += '• No preferences found in backend\n';
+              statusReport += '• Please complete onboarding in Settings > Preferences\n\n';
+            }
+            
+            statusReport += '**Next Steps:**\n';
+            statusReport += '• Check browser console for detailed debug logs\n';
+            statusReport += '• Try `/fix-preferences` to auto-repair common issues\n';
+            statusReport += '• Use `/preferences hobbies` to test specific queries\n';
+            
+            responses.push(this.createMessage(
+              'assistant',
+              statusReport,
+              { toolName: 'preferencesDebug', toolData: status }
+            ));
+          } catch (error) {
+            responses.push(this.createMessage(
+              'assistant',
+              `❌ **Debug Failed:** ${error instanceof Error ? error.message : 'Unknown error'}\n\nCheck browser console for details.`,
+              { error: true, toolName: 'preferencesDebug' }
+            ));
+          }
+          break;
+          
+        case '/fix-preferences':
+          responses.push(this.createMessage('system', 'Auto-fixing preference issues...', { loading: true }));
+          try {
+            await PreferencesDebugger.autoFix();
+            const statusAfterFix = await PreferencesDebugger.quickStatus();
+            
+            let fixReport = '🔧 **Preferences Auto-Fix Complete**\n\n';
+            fixReport += '**Status After Fix:**\n';
+            fixReport += `• Backend Preferences: ${statusAfterFix.backendPreferences ? '✅' : '❌'}\n`;
+            fixReport += `• Local Profile: ${statusAfterFix.localProfile ? '✅' : '❌'}\n`;
+            fixReport += `• Personalization: ${statusAfterFix.personalizedGreeting ? '✅' : '❌'}\n\n`;
+            
+            if (statusAfterFix.backendPreferences && statusAfterFix.localProfile) {
+              fixReport += '✅ **System Fixed!** Try asking "What are my hobbies?" now.';
+            } else {
+              fixReport += '⚠️ **Still Issues:** Please complete your preferences in Settings.';
+            }
+            
+            responses.push(this.createMessage(
+              'assistant',
+              fixReport,
+              { toolName: 'preferencesFix', toolData: statusAfterFix }
+            ));
+          } catch (error) {
+            responses.push(this.createMessage(
+              'assistant',
+              `❌ **Auto-fix Failed:** ${error instanceof Error ? error.message : 'Unknown error'}`,
+              { error: true, toolName: 'preferencesFix' }
+            ));
+          }
           break;
           
         case '/connect':
@@ -303,6 +376,28 @@ export class ChatService {
             break;
           }
           
+          if (command.startsWith('/preferences') || command.startsWith('/profile')) {
+            // Handle preference queries
+            const query = userMessage.slice(command.indexOf(' ') + 1).trim() || 'show my preferences';
+            responses.push(this.createMessage('system', 'Retrieving your preferences...', { loading: true }));
+            const preferenceResponse = await UserProfileService.handlePreferenceQuery(query);
+            
+            if (preferenceResponse) {
+              responses.push(this.createMessage(
+                'assistant',
+                preferenceResponse,
+                { toolName: 'userProfile' }
+              ));
+            } else {
+              responses.push(this.createMessage(
+                'assistant',
+                'I can help you with your preferences! Try asking:\n• "What are my hobbies?"\n• "What is my profession?"\n• "Show my communication style"\n• "What are my interests?"',
+                { toolName: 'userProfile' }
+              ));
+            }
+            break;
+          }
+          
           if (command.startsWith('/generate')) {
             const prompt = userMessage.slice(9).trim().replace(/"/g, '');
             if (!prompt) {
@@ -361,11 +456,16 @@ export class ChatService {
           if (aiAvailable) {
             // Use AI to process natural language query
             console.log('🧠 Sending query to AI service...');
+            // Get user preferences for response style
+            const communicationStyle = await UserProfileService.getCommunicationStyle();
+            const responseStyle = communicationStyle?.response_length === 'short' ? 'brief' : 
+                                communicationStyle?.response_length === 'long' ? 'detailed' : 'conversational';
+            
             const aiResponse = await AIService.processQuery({
               query: userMessage,
               sessionId,
               preferences: {
-                responseStyle: 'conversational',
+                responseStyle,
                 includeActions: true
               }
             });
@@ -425,24 +525,44 @@ export class ChatService {
     return responses;
   }
 
-  private static getHelpMessage(): string {
-    let helpText = "🤖 **Available Commands:**\n\n";
+  private static async getHelpMessage(): Promise<string> {
+    // Get user's name for personalization
+    const personalInfo = await UserProfileService.getPersonalInfo();
+    const greeting = personalInfo?.name ? `Hi ${personalInfo.name}!` : 'Hello!';
+    
+    let helpText = `${greeting} 🤖 **Available Commands:**\n\n`;
     
     AVAILABLE_COMMANDS.forEach(cmd => {
       helpText += `**${cmd.command}** - ${cmd.description}\n`;
       helpText += `Example: \`${cmd.example}\`\n\n`;
     });
     
+    // Add new personalization commands
+    helpText += "👤 **Personal Commands:**\n";
+    helpText += "• `/preferences` or `/profile` - View or ask about your personal preferences\n";
+    helpText += "• `/preferences hobbies` - See your hobbies\n";
+    helpText += "• `/profile profession` - Check your work info\n";
+    helpText += "• `/debug-preferences` - Debug personalization system issues\n";
+    helpText += "• `/fix-preferences` - Auto-fix common preference problems\n\n";
+    
     helpText += "🤖 **Natural Language Queries:**\n";
-    helpText += "You can also ask me questions naturally! Try:\n";
+    helpText += "You can ask me anything naturally! Try:\n\n";
+    helpText += "**📅 Calendar & Email:**\n";
     helpText += "• \"What meetings do I have today?\"\n";
-    helpText += "• \"Do I have any meetings after lunch?\"\n";
     helpText += "• \"Check my latest emails\"\n";
     helpText += "• \"Any urgent messages?\"\n\n";
+    helpText += "**👤 About You:**\n";
+    helpText += "• \"What are my hobbies?\"\n";
+    helpText += "• \"What is my profession?\"\n";
+    helpText += "• \"What technologies do I use?\"\n";
+    helpText += "• \"How do I like to communicate?\"\n";
+    helpText += "• \"What is my work style?\"\n";
+    helpText += "• \"Show me all my preferences\"\n\n";
     
     helpText += "💡 **Tips:**\n";
     helpText += "• Commands start with `/`\n";
     helpText += "• Natural language works without `/`\n";
+    helpText += "• I remember your preferences and adapt my responses\n";
     helpText += "• Make sure your Google Workspace is connected\n";
     helpText += "• Check /status if commands aren't working\n";
     
