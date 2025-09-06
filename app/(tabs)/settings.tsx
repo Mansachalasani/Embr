@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { router } from 'expo-router';
 import { UserPreferencesService } from '../../services/userPreferencesService';
 import { UserPersonalizationData } from '../../types/userPreferences';
+import { AppModeService, AppMode, AppModePreferences } from '../../services/appModeService';
 
 export default function Settings() {
   const { user, signOut } = useAuth();
@@ -15,9 +16,11 @@ export default function Settings() {
   const [loading, setLoading] = useState(false);
   const [userPreferences, setUserPreferences] = useState<UserPersonalizationData | null>(null);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
+  const [appModePreferences, setAppModePreferences] = useState<AppModePreferences | null>(null);
 
   useEffect(() => {
     loadUserPreferences();
+    loadAppModePreferences();
   }, []);
 
   const loadUserPreferences = async () => {
@@ -29,6 +32,15 @@ export default function Settings() {
       }
     } catch (error) {
       console.error('Error loading preferences:', error);
+    }
+  };
+
+  const loadAppModePreferences = async () => {
+    try {
+      const prefs = await AppModeService.getAppModePreferences();
+      setAppModePreferences(prefs);
+    } catch (error) {
+      console.error('Error loading app mode preferences:', error);
     }
   };
 
@@ -67,6 +79,32 @@ export default function Settings() {
         }
       ]
     );
+  };
+
+  const handleModeChange = async (newMode: AppMode) => {
+    try {
+      await AppModeService.setDefaultMode(newMode);
+      await loadAppModePreferences();
+      
+      const modeLabel = newMode === 'speech' ? 'Speech' : 'Typing';
+      Alert.alert(
+        'Mode Changed', 
+        `Default mode set to ${modeLabel}. ${newMode === 'speech' ? 'Voice mode will be preferred when starting the app.' : 'Text input will be the default interface.'}`
+      );
+    } catch (error) {
+      console.error('❌ Error changing mode:', error);
+      Alert.alert('Error', 'Failed to change app mode');
+    }
+  };
+
+  const handleAutoStartChange = async (enabled: boolean) => {
+    try {
+      await AppModeService.setAutoStartSpeech(enabled);
+      await loadAppModePreferences();
+    } catch (error) {
+      console.error('❌ Error changing auto-start setting:', error);
+      Alert.alert('Error', 'Failed to change auto-start setting');
+    }
   };
 
   const settingsItems = [
@@ -128,6 +166,31 @@ export default function Settings() {
     {
       title: '🔥 Embr Settings',
       items: [
+        {
+          title: 'Default Interface Mode',
+          subtitle: appModePreferences ? 
+            `${appModePreferences.defaultMode === 'speech' ? 'Voice' : 'Typing'} mode` : 
+            'Loading...',
+          icon: appModePreferences?.defaultMode === 'speech' ? 'mic' : 'keyboard',
+          onPress: () => {
+            if (!appModePreferences) return;
+            const newMode = appModePreferences.defaultMode === 'speech' ? 'typing' : 'speech';
+            handleModeChange(newMode);
+          },
+          customIcon: true,
+          gradient: appModePreferences?.defaultMode === 'speech',
+        },
+        {
+          title: 'Auto-start Voice Mode',
+          subtitle: 'Automatically enable voice mode when opening the app',
+          icon: 'mic-outline',
+          onPress: () => {
+            if (!appModePreferences) return;
+            handleAutoStartChange(!appModePreferences.autoStartSpeech);
+          },
+          hasToggle: true,
+          toggleValue: appModePreferences?.autoStartSpeech || false,
+        },
         {
           title: 'Dark Mode',
           icon: isDark ? 'moon' : 'sunny',
@@ -296,7 +359,11 @@ export default function Settings() {
             activeOpacity={0.7}
           >
             <View style={styles.settingItemContent}>
-              <Ionicons name={item.icon as any} size={22} color={item.gradient ? '#fff' : colors.primary} />
+              {item.customIcon ? (
+                <MaterialIcons name={item.icon as any} size={22} color={item.gradient ? '#fff' : colors.primary} />
+              ) : (
+                <Ionicons name={item.icon as any} size={22} color={item.gradient ? '#fff' : colors.primary} />
+              )}
               <Text style={[styles.settingItemText, { color: item.gradient ? '#fff' : colors.text }]}>
                 {item.title}
               </Text>
@@ -328,11 +395,19 @@ export default function Settings() {
         disabled={item.disabled}
       >
         <View style={styles.settingItemContent}>
-          <Ionicons 
-            name={item.icon as any} 
-            size={22} 
-            color={isGradientItem ? '#fff' : item.disabled ? colors.textSecondary : colors.primary} 
-          />
+          {item.customIcon ? (
+            <MaterialIcons 
+              name={item.icon as any} 
+              size={22} 
+              color={isGradientItem ? '#fff' : item.disabled ? colors.textSecondary : colors.primary} 
+            />
+          ) : (
+            <Ionicons 
+              name={item.icon as any} 
+              size={22} 
+              color={isGradientItem ? '#fff' : item.disabled ? colors.textSecondary : colors.primary} 
+            />
+          )}
           <View style={styles.settingItemTextContainer}>
             <Text style={[
               styles.settingItemText, 

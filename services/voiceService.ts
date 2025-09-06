@@ -27,15 +27,22 @@ export class VoiceService {
   private lastRecordingUri: string | null = null;
   private isContinuousMode = false;
   private silenceTimeout: NodeJS.Timeout | null = null;
-  private volumeThreshold = 0.01; // Silence threshold
-  private silenceDelay = 4500; // 4.5 seconds of silence before auto-processing (much longer for complete speech)
-  private minRecordingDuration = 2000; // Minimum 2 seconds recording before processing
-  private maxRecordingDuration = 45000; // Maximum 45 seconds per recording (longer for complete thoughts)
+  private volumeThreshold = 0.02; // Improved silence threshold (higher to avoid noise)
+  private silenceDelay = 2000; // 2 seconds of silence before auto-processing (faster response)
+  private minRecordingDuration = 1000; // Minimum 1 second recording before processing (faster)
+  private maxRecordingDuration = 30000; // Maximum 30 seconds per recording (shorter for better UX)
   private recordingStartTime: number = 0;
   private onContinuousMessage?: (message: any) => void;
   private continuousSessionId?: string;
   private lastSpeechDetectedTime: number = 0;
   private recordingStatus: any = null; // Store recording status for voice level monitoring
+  private voiceDetectionInterval: NodeJS.Timeout | null = null;
+  private recentVolumeReadings: number[] = []; // Rolling average of volume levels
+  private volumeHistorySize = 10; // Keep last 10 readings
+  private speechStartThreshold = 0.03; // Threshold to detect speech start
+  private speechEndThreshold = 0.015; // Lower threshold to detect speech end
+  private consecutiveSilentChecks = 0; // Count consecutive silent intervals
+  private maxSilentChecks = 6; // Number of consecutive silent checks before processing (2 seconds at 300ms intervals)
 
   /**
    * Initialize voice service and request microphone permissions
@@ -290,6 +297,20 @@ export class VoiceService {
       this.sound.unloadAsync().catch(console.error);
       this.sound = null;
     }
+    
+    // Clean up voice detection
+    if (this.voiceDetectionInterval) {
+      clearInterval(this.voiceDetectionInterval);
+      this.voiceDetectionInterval = null;
+    }
+    if (this.silenceTimeout) {
+      clearTimeout(this.silenceTimeout);
+      this.silenceTimeout = null;
+    }
+    
+    // Reset voice detection state
+    this.consecutiveSilentChecks = 0;
+    this.recentVolumeReadings = [];
   }
 
   /**
@@ -837,6 +858,12 @@ async speechToTextFromBase64(base64Audio: string): Promise<{
         this.silenceTimeout = null;
       }
       
+      // Clear voice detection interval
+      if (this.voiceDetectionInterval) {
+        clearInterval(this.voiceDetectionInterval);
+        this.voiceDetectionInterval = null;
+      }
+      
       // Stop current recording if active
       if (this.isRecording) {
         await this.stopRecording();
@@ -882,15 +909,27 @@ async speechToTextFromBase64(base64Audio: string): Promise<{
   private startIntelligentSilenceDetection(): void {
     if (!this.recording) return;
     
-    console.log('🎤 Starting intelligent voice activity detection...');
+    console.log('🎤 Starting enhanced voice activity detection...');
     
-    // Use actual recording status monitoring for voice level detection
-    const statusCheckInterval = 300; // Check every 300ms for more responsive detection
-    let consecutiveLowVolumeChecks = 0;
-    const requiredSilenceChecks = Math.ceil(this.silenceDelay / statusCheckInterval);
+    // Clear any existing detection interval
+    if (this.voiceDetectionInterval) {
+      clearInterval(this.voiceDetectionInterval);
+    }
+    
+    // Reset detection state
+    this.consecutiveSilentChecks = 0;
+    this.recentVolumeReadings = [];
+    
+    const statusCheckInterval = 300; // Check every 300ms for responsive detection
     
     const checkVoiceActivity = async () => {
-      if (!this.isContinuousMode || !this.isRecording || !this.recording) return;
+      if (!this.isContinuousMode || !this.isRecording || !this.recording) {
+        if (this.voiceDetectionInterval) {
+          clearInterval(this.voiceDetectionInterval);
+          this.voiceDetectionInterval = null;
+        }
+        return;
+      }
       
       try {
         // Get current recording status including audio levels
@@ -900,42 +939,67 @@ async speechToTextFromBase64(base64Audio: string): Promise<{
         const currentTime = Date.now();
         const recordingDuration = currentTime - this.recordingStartTime;
         
-        // Don't process if recording is too short (ensure we capture complete thoughts)
-        if (recordingDuration < this.minRecordingDuration) {
-          setTimeout(checkVoiceActivity, statusCheckInterval);
-          return;
-        }
-        
-        // Auto-process if recording is getting too long (safety mechanism for very long speech)
+        // Auto-process if recording is getting too long (safety mechanism)
         if (recordingDuration > this.maxRecordingDuration) {
           console.log('⏰ Maximum recording duration reached - processing speech...');
           this.processContinuousRecording();
           return;
         }
         
-        // Check if recording is actually active and has audio data
-        if (status.isRecording) {
-          // For now, use a more conservative timeout-based approach but with much longer delays
-          // In the future, this could use actual volume level detection from status.metering
+        // Don't process if recording is too short (minimum duration check)
+        if (recordingDuration < this.minRecordingDuration) {
+          return;
+        }
+        
+        // Check if recording is actually active
+        if (status.isRecording && status.metering !== undefined) {
+          // Use actual audio metering if available
+          const currentVolume = Math.abs(status.metering || 0);
           
-          // Reset silence counter if we detect the recording is still actively receiving data
-          if (status.durationMillis > this.lastSpeechDetectedTime + 500) {
-            this.lastSpeechDetectedTime = status.durationMillis;
-            consecutiveLowVolumeChecks = 0;
-            console.log(`🎙️ Voice activity detected at ${recordingDuration}ms`);
+          // Add to volume history (rolling average)
+          this.recentVolumeReadings.push(currentVolume);
+          if (this.recentVolumeReadings.length > this.volumeHistorySize) {
+            this.recentVolumeReadings.shift();
+          }
+          
+          // Calculate average volume over recent readings
+          const avgVolume = this.recentVolumeReadings.reduce((a, b) => a + b, 0) / this.recentVolumeReadings.length;
+          
+          // Enhanced voice activity detection
+          const isSpeaking = avgVolume > this.speechEndThreshold;
+          
+          if (isSpeaking) {
+            // Reset silence counter when speech is detected
+            this.consecutiveSilentChecks = 0;
+            this.lastSpeechDetectedTime = currentTime;
+            console.log(`🎙️ Voice activity detected (volume: ${avgVolume.toFixed(4)}) at ${recordingDuration}ms`);
           } else {
-            consecutiveLowVolumeChecks++;
+            // Increment silence counter
+            this.consecutiveSilentChecks++;
+            
+            // Process after enough consecutive silent checks
+            if (this.consecutiveSilentChecks >= this.maxSilentChecks) {
+              console.log(`🤫 Silence detected after ${recordingDuration}ms - processing complete speech...`);
+              this.processContinuousRecording();
+              return;
+            }
           }
-          
-          // Only process after extended silence (4.5+ seconds)
-          if (consecutiveLowVolumeChecks >= requiredSilenceChecks) {
-            console.log(`🤫 Extended silence detected after ${recordingDuration}ms - processing complete speech...`);
-            this.processContinuousRecording();
-            return;
+        } else if (status.isRecording) {
+          // Fallback for when metering is not available
+          // Use duration-based detection similar to before but with improved timing
+          if (status.durationMillis > this.lastSpeechDetectedTime + 800) {
+            this.lastSpeechDetectedTime = status.durationMillis;
+            this.consecutiveSilentChecks = 0;
+            console.log(`🎙️ Voice activity detected (fallback) at ${recordingDuration}ms`);
+          } else {
+            this.consecutiveSilentChecks++;
+            
+            if (this.consecutiveSilentChecks >= this.maxSilentChecks) {
+              console.log(`🤫 Silence detected (fallback) after ${recordingDuration}ms - processing speech...`);
+              this.processContinuousRecording();
+              return;
+            }
           }
-          
-          // Continue monitoring
-          setTimeout(checkVoiceActivity, statusCheckInterval);
         } else {
           // Recording stopped unexpectedly, process what we have
           console.log('🛑 Recording stopped unexpectedly, processing...');
@@ -949,12 +1013,12 @@ async speechToTextFromBase64(base64Audio: string): Promise<{
           if (this.isContinuousMode && this.isRecording) {
             this.processContinuousRecording();
           }
-        }, 2000);
+        }, 1000);
       }
     };
     
-    // Start voice activity detection after initial buffer period
-    setTimeout(checkVoiceActivity, this.minRecordingDuration);
+    // Start voice activity detection using interval instead of recursive setTimeout
+    this.voiceDetectionInterval = setInterval(checkVoiceActivity, statusCheckInterval);
   }
 
   /**

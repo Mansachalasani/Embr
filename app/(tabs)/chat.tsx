@@ -28,6 +28,7 @@ import { FileOperationCard } from '../../components/FileOperationCard';
 import { DocumentAnalysisCard } from '../../components/DocumentAnalysisCard';
 import { DriveFileCard } from '../../components/DriveFileCard';
 import { DocumentCreationModal } from '../../components/DocumentCreationModal';
+import { AppModeService, AppMode } from '../../services/appModeService';
 import { useTheme } from '../../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -327,6 +328,7 @@ export default function Chat() {
     toolStatus?: string;
   } | null>(null);
   const [isVoiceModeEnabled, setIsVoiceModeEnabled] = useState(false);
+  const [currentAppMode, setCurrentAppMode] = useState<AppMode>('typing');
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const messageCache = useRef<Map<string, ChatMessage[]>>(new Map());
@@ -334,8 +336,44 @@ export default function Chat() {
   // Initialize session on component mount
   useEffect(() => {
     initializeSession();
-
   }, []);
+
+  // Initialize app mode preferences
+  useEffect(() => {
+    initializeAppMode();
+  }, []);
+
+  const initializeAppMode = async () => {
+    try {
+      const preferences = await AppModeService.getAppModePreferences();
+      setCurrentAppMode(preferences.defaultMode);
+      
+      // Auto-start speech mode if enabled
+      if (await AppModeService.shouldAutoStartSpeech()) {
+        console.log('🎤 Auto-starting speech mode based on preferences');
+        setIsVoiceModeEnabled(true);
+        
+        // Wait for current session to be available, then auto-start continuous recording
+        const waitForSession = () => {
+          if (currentSession?.id) {
+            console.log('🎤 Auto-starting continuous voice recording...');
+            // Auto-enable continuous mode since speech is the preferred mode
+            startContinuousVoiceMode();
+          } else {
+            // Check again in 500ms
+            setTimeout(waitForSession, 500);
+          }
+        };
+        
+        // Start checking for session after a brief delay
+        setTimeout(waitForSession, 1000);
+      }
+    } catch (error) {
+      console.error('❌ Error initializing app mode:', error);
+      // Default to typing mode on error
+      setCurrentAppMode('typing');
+    }
+  };
 
 
 
@@ -705,6 +743,28 @@ export default function Chat() {
     }
   };
 
+  const startContinuousVoiceMode = async () => {
+    try {
+      if (!currentSession?.id) {
+        console.warn('⚠️ No session available for continuous voice mode');
+        return;
+      }
+      
+      // Import VoiceService dynamically to avoid import issues
+      const { VoiceService } = await import('../../services/voiceService');
+      
+      // Enable conversation mode on the backend first
+      await VoiceService.enableConversationMode(currentSession.id);
+      
+      // The VoiceChat component should automatically start continuous mode
+      // since we're setting voice mode to enabled
+      console.log('✅ Continuous voice mode started for session:', currentSession.id);
+      
+    } catch (error) {
+      console.error('❌ Error starting continuous voice mode:', error);
+    }
+  };
+
   const handleNewSession = async () => {
     try {
       setIsSessionLoading(true);
@@ -938,12 +998,14 @@ export default function Chat() {
               color={colors.primary}
             />
           </TouchableOpacity>
-          {/* <View style={styles.sessionInfo}>
+          
+          <View style={styles.sessionInfo}>
             <MaterialIcons name="chat" size={20} color={colors.primary} />
             <Text style={styles.sessionTitle} numberOfLines={1}>
               {currentSession?.title || 'Chat Session'}
             </Text>
-          </View> */}
+          </View>
+          
           <TouchableOpacity style={styles.newChatButton} onPress={handleNewSession}>
             <MaterialIcons name="add" size={20} color={colors.primary} />
           </TouchableOpacity>
@@ -1021,6 +1083,8 @@ export default function Chat() {
             onVoiceMessage={handleVoiceMessage}
             onVoiceModeChange={handleVoiceModeChange}
             disabled={isLoading}
+            currentAppMode={currentAppMode}
+            autoStartContinuous={currentAppMode === 'speech' && isVoiceModeEnabled}
           />
 
           <View style={styles.inputContainer}>

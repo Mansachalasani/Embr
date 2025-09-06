@@ -19,13 +19,17 @@ interface VoiceChatProps {
   onVoiceMessage?: (userText: string, aiText: string, audioData: ArrayBuffer) => void;
   onVoiceModeChange?: (enabled: boolean) => void;
   disabled?: boolean;
+  currentAppMode?: 'typing' | 'speech';
+  autoStartContinuous?: boolean;
 }
 
 export function VoiceChat({ 
   sessionId, 
   onVoiceMessage, 
   onVoiceModeChange,
-  disabled = false 
+  disabled = false,
+  currentAppMode = 'typing',
+  autoStartContinuous = false
 }: VoiceChatProps) {
   const { colors } = useTheme();
   const [isVoiceModeEnabled, setIsVoiceModeEnabled] = useState(false);
@@ -208,6 +212,22 @@ export function VoiceChat({
       fontWeight: '600',
       marginLeft: 3,
     },
+    speechModeIndicator: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      backgroundColor: colors.success + '15',
+      borderRadius: 16,
+      marginLeft: 8,
+      borderWidth: 1,
+      borderColor: colors.success + '30',
+    },
+    speechModeText: {
+      fontSize: 12,
+      fontWeight: '600',
+      marginLeft: 6,
+    },
   });
 
   // Initialize voice service and check permissions
@@ -219,6 +239,36 @@ export function VoiceChat({
   useEffect(() => {
     onVoiceModeChange?.(isVoiceModeEnabled);
   }, [isVoiceModeEnabled, onVoiceModeChange]);
+
+  // Auto-start continuous mode when app is in speech mode
+  useEffect(() => {
+    const autoStartContinuousMode = async () => {
+      if (autoStartContinuous && sessionId && hasPermission && !isContinuousMode && !disabled) {
+        console.log('🎤 Auto-starting continuous voice mode...');
+        try {
+          // Enable voice mode first
+          if (!isVoiceModeEnabled) {
+            const result = await VoiceService.enableConversationMode(sessionId);
+            if (result.success) {
+              setIsVoiceModeEnabled(true);
+            }
+          }
+          
+          // Start continuous mode with a slight delay
+          setTimeout(async () => {
+            if (sessionId) {
+              await toggleContinuousMode();
+            }
+          }, 1000);
+          
+        } catch (error) {
+          console.error('❌ Error auto-starting continuous mode:', error);
+        }
+      }
+    };
+
+    autoStartContinuousMode();
+  }, [autoStartContinuous, sessionId, hasPermission, isContinuousMode, disabled, isVoiceModeEnabled]);
 
   // Recording animation
   useEffect(() => {
@@ -598,45 +648,49 @@ export function VoiceChat({
 
   return (
     <View style={styles.container}>
-      {/* Voice Mode Toggle */}
-      <TouchableOpacity 
-        style={styles.voiceModeToggle}
-        onPress={toggleVoiceMode}
-        disabled={disabled}
-      >
-        <MaterialIcons
-          name={isVoiceModeEnabled ? "mic" : "mic-off"}
-          size={16}
-          color={isVoiceModeEnabled ? colors.primary : colors.textSecondary}
-        />
-        <Text style={styles.voiceModeText}>
-          {isVoiceModeEnabled ? 'Voice' : 'Voice'}
-        </Text>
-      </TouchableOpacity>
-
-      {/* Record Button */}
-      <Animated.View
-        style={[
-          { transform: [{ scale: pulseAnimation }] }
-        ]}
-      >
-        <TouchableOpacity
-          style={[styles.recordButton, getRecordButtonStyle()]}
-          onPress={isRecording ? stopRecording : startRecording}
-          disabled={disabled || !isVoiceModeEnabled || isProcessing || isPlaying}
-          activeOpacity={0.8}
+      {/* Voice Mode Toggle - Hidden in speech mode since it auto-starts */}
+      {currentAppMode !== 'speech' && (
+        <TouchableOpacity 
+          style={styles.voiceModeToggle}
+          onPress={toggleVoiceMode}
+          disabled={disabled}
         >
-          {isProcessing ? (
-            <ActivityIndicator size="small" color="white" />
-          ) : (
-            <MaterialIcons
-              name={getRecordButtonIcon()}
-              size={20}
-              color="white"
-            />
-          )}
+          <MaterialIcons
+            name={isVoiceModeEnabled ? "mic" : "mic-off"}
+            size={16}
+            color={isVoiceModeEnabled ? colors.primary : colors.textSecondary}
+          />
+          <Text style={styles.voiceModeText}>
+            {isVoiceModeEnabled ? 'Voice' : 'Voice'}
+          </Text>
         </TouchableOpacity>
-      </Animated.View>
+      )}
+
+      {/* Record Button - Hidden in speech mode since continuous mode auto-starts */}
+      {currentAppMode !== 'speech' && (
+        <Animated.View
+          style={[
+            { transform: [{ scale: pulseAnimation }] }
+          ]}
+        >
+          <TouchableOpacity
+            style={[styles.recordButton, getRecordButtonStyle()]}
+            onPress={isRecording ? stopRecording : startRecording}
+            disabled={disabled || !isVoiceModeEnabled || isProcessing || isPlaying}
+            activeOpacity={0.8}
+          >
+            {isProcessing ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <MaterialIcons
+                name={getRecordButtonIcon()}
+                size={20}
+                color="white"
+              />
+            )}
+          </TouchableOpacity>
+        </Animated.View>
+      )}
 
       {/* Status Display */}
       {!hasPermission ? (
@@ -701,8 +755,8 @@ export function VoiceChat({
         </TouchableOpacity>
       )}
 
-      {/* Continuous Mode Button */}
-      {isVoiceModeEnabled && sessionId && (
+      {/* Continuous Mode Button - Hidden in speech mode since it auto-starts */}
+      {currentAppMode !== 'speech' && isVoiceModeEnabled && sessionId && (
         <TouchableOpacity 
           style={[
             styles.continuousButton,
@@ -735,6 +789,32 @@ export function VoiceChat({
             {isContinuousMode ? 'Stop Auto' : 'Auto Chat'}
           </Text>
         </TouchableOpacity>
+      )}
+      
+      {/* In speech mode, show a simple indicator */}
+      {currentAppMode === 'speech' && isContinuousMode && (
+        <View style={[styles.speechModeIndicator]}>
+          <MaterialIcons 
+            name="mic" 
+            size={16} 
+            color={colors.success} 
+          />
+          {isListening && (
+            <Animated.View
+              style={{
+                marginLeft: 6,
+                width: 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: colors.success,
+                opacity: recordingAnimation,
+              }}
+            />
+          )}
+          <Text style={[styles.speechModeText, { color: colors.success }]}>
+            {isListening ? 'Listening...' : 'Voice Ready'}
+          </Text>
+        </View>
       )}
     </View>
   );
