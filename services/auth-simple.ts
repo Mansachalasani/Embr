@@ -3,6 +3,7 @@ import * as AuthSession from 'expo-auth-session';
 import { supabase } from '../lib/supabase';
 import { User } from '@supabase/supabase-js';
 import * as Linking from "expo-linking";
+import { Platform } from 'react-native';
 
 // WebBrowser.maybeCompleteAuthSession();
 
@@ -311,11 +312,13 @@ export const signInWithGoogle = async () => {
   try {
     console.log("🚀 Starting Google Sign In with proper scopes...");
 
-    // Step 1: Redirect URL
-    const redirectUrl = AuthSession.makeRedirectUri({
-      useProxy: true,
-      preferLocalhost: true,
-    });
+    // Step 1: Redirect URL - Dynamic based on platform and environment
+    const redirectUrl = Platform.OS === 'web' 
+      ? `${window.location.origin}/auth/callback`
+      : AuthSession.makeRedirectUri({
+          useProxy: true,
+          preferLocalhost: false, // Allow dynamic detection
+        });
     console.log("📍 Redirect URL generated:", redirectUrl);
 
     // Step 2: Supabase OAuth options
