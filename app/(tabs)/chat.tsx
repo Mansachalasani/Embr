@@ -11,6 +11,7 @@ import {
   Alert,
   ActivityIndicator,
   Dimensions,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -312,6 +313,97 @@ export default function Chat() {
       shadowRadius: 8,
       elevation: 8,
     },
+    
+    // Voice button styles
+    voiceButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.surfaceVariant,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    
+    // Push-to-talk modal styles
+    voiceModalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'flex-end',
+    },
+    voiceModalBackdrop: {
+      flex: 1,
+    },
+    voiceModalContainer: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      padding: 32,
+      alignItems: 'center',
+      paddingBottom: 40,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 16,
+      elevation: 16,
+    },
+    voiceModalTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: colors.text,
+      marginBottom: 8,
+    },
+    voiceModalSubtitle: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      marginBottom: 32,
+      textAlign: 'center',
+    },
+    holdToTalkButton: {
+      width: 160,
+      height: 160,
+      borderRadius: 80,
+      backgroundColor: colors.surfaceVariant,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 24,
+      borderWidth: 3,
+      borderColor: colors.primary,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.2,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    holdToTalkButtonRecording: {
+      backgroundColor: '#ffebee',
+      borderColor: '#ff4444',
+      transform: [{ scale: 1.1 }],
+    },
+    recordingIndicator: {
+      position: 'absolute',
+      bottom: -40,
+      alignItems: 'center',
+      flexDirection: 'row',
+    },
+    recordingText: {
+      marginLeft: 8,
+      fontSize: 14,
+      color: '#ff4444',
+      fontWeight: '600',
+    },
+    voiceModalCancelButton: {
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+      borderRadius: 20,
+    },
+    voiceModalCancelText: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      fontWeight: '600',
+    },
   });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -330,6 +422,8 @@ export default function Chat() {
   const [isVoiceModeEnabled, setIsVoiceModeEnabled] = useState(false);
   const [currentAppMode, setCurrentAppMode] = useState<AppMode>('typing');
   const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [showVoicePopup, setShowVoicePopup] = useState(false);
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const messageCache = useRef<Map<string, ChatMessage[]>>(new Map());
 
@@ -776,6 +870,52 @@ export default function Chat() {
     }
   };
 
+  // Push-to-talk recording functions
+  const startPushToTalkRecording = async () => {
+    try {
+      setIsRecordingVoice(true);
+      
+      // Initialize voice service if not already done
+      const { VoiceService } = await import('../../services/voiceService');
+      const voiceService = new VoiceService();
+      
+      await voiceService.startRecording();
+      
+      console.log('🎤 Started push-to-talk recording');
+    } catch (error) {
+      console.error('❌ Error starting push-to-talk recording:', error);
+      setIsRecordingVoice(false);
+    }
+  };
+
+  const stopPushToTalkRecording = async () => {
+    try {
+      const { VoiceService } = await import('../../services/voiceService');
+      const voiceService = new VoiceService();
+      
+      const audioUri = await voiceService.stopRecording();
+      setIsRecordingVoice(false);
+      
+      if (audioUri && currentSession?.id) {
+        // Process the voice message
+        const result = await VoiceService.processVoiceMessage(audioUri);
+        
+        if (result.success && result.userText && result.aiText) {
+          // Add messages to chat
+          await handleVoiceMessage(result.userText, result.aiText, result.audioData || new ArrayBuffer(0));
+        }
+      }
+      
+      // Hide the popup after recording
+      setShowVoicePopup(false);
+      
+    } catch (error) {
+      console.error('❌ Error stopping push-to-talk recording:', error);
+      setIsRecordingVoice(false);
+      setShowVoicePopup(false);
+    }
+  };
+
   const handleSelectSession = async (sessionId: string) => {
     try {
       setIsSessionLoading(true);
@@ -1078,16 +1218,18 @@ export default function Chat() {
 
 
           {/* Voice Chat Component */}
-          <VoiceChat
-            sessionId={currentSession?.id}
-            onVoiceMessage={handleVoiceMessage}
-            onVoiceModeChange={handleVoiceModeChange}
-            disabled={isLoading}
-            currentAppMode={currentAppMode}
-            autoStartContinuous={currentAppMode === 'speech' && isVoiceModeEnabled}
-          />
+          
 
           <View style={styles.inputContainer}>
+            {/* Voice Button - Left of input */}
+            <TouchableOpacity
+              style={styles.voiceButton}
+              onPress={() => setShowVoicePopup(true)}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons name="mic" size={24} color={colors.primary} />
+            </TouchableOpacity>
+
             <TextInput
               style={[
                 styles.textInput,
@@ -1138,6 +1280,50 @@ export default function Chat() {
           visible={showDocumentModal}
           onClose={() => setShowDocumentModal(false)}
         />
+
+        {/* Push-to-Talk Modal */}
+        <Modal
+          visible={showVoicePopup}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => {
+            setShowVoicePopup(false);
+            setIsRecordingVoice(false);
+          }}
+        >
+          <View style={styles.voiceModalOverlay}>
+            <TouchableOpacity
+              style={styles.voiceModalBackdrop}
+              onPress={() => {
+                setShowVoicePopup(false);
+                setIsRecordingVoice(false);
+              }}
+            />
+            <View style={styles.voiceModalContainer}>
+              <Text style={styles.voiceModalTitle}>Voice Message</Text>
+              <Text style={styles.voiceModalSubtitle}>
+                {isRecordingVoice ? 'Release to send' : 'Hold to record'}
+              </Text>
+              
+              {/* Big Push-to-Talk Button */}
+              <VoiceChat
+            sessionId={currentSession?.id}
+            onVoiceMessage={handleVoiceMessage}
+            onVoiceModeChange={handleVoiceModeChange}
+            disabled={isLoading}
+            currentAppMode={currentAppMode}
+            autoStartContinuous={currentAppMode === 'speech' && isVoiceModeEnabled}
+          />
+              
+              <TouchableOpacity
+                style={styles.voiceModalCancelButton}
+                onPress={() => setShowVoicePopup(false)}
+              >
+                <Text style={styles.voiceModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </LinearGradient>
     </SafeAreaView>
   );

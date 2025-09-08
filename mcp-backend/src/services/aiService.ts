@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AIToolMetadata, AIToolSelection, AIResponse, UserContext } from '../types/aiTools';
 import { MCPToolRegistry } from './mcpToolRegistry';
 import { SessionService } from './sessionService';
+import { supabase } from './supabase';
 
 export class AIService {
   private genAI: GoogleGenerativeAI;
@@ -73,7 +74,7 @@ export class AIService {
    */
   private async enrichContextWithPreferences(context: UserContext, userId: string): Promise<UserContext> {
     try {
-      const { supabase } = require('../config/supabase');
+      
       
       // Fetch user preferences from database
       const { data, error } = await supabase
