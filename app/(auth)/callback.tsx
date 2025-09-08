@@ -38,18 +38,18 @@ export default function AuthCallback() {
           // 👉 For web: Check if there are auth tokens in the URL
           const hashParams = new URLSearchParams(window.location.hash.substring(1));
           const searchParams = new URLSearchParams(window.location.search);
-          
+
           // Check for auth tokens in URL hash or search params
           const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
           const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token');
           const error = hashParams.get('error') || searchParams.get('error');
-          
+
           if (error) {
             console.error("❌ Auth callback error:", error);
             router.replace("/signin?error=auth_failed");
             return;
           }
-console.log(accessToken,refreshToken)
+
           if (accessToken && refreshToken) {
             // Set the session with the tokens from URL
             const { data, error: sessionError } = await supabase.auth.setSession({
@@ -72,10 +72,22 @@ console.log(accessToken,refreshToken)
             }
           }
         }
+        else{
+          const { data: { session } } = await supabase.auth.getSession();
+        
+          if (session) {
+            console.log("✅ Native auth success:", session.user.email);
+            router.replace("/");
+          } else {
+            console.log("⚠️ No session found in native callback");
+            router.replace("/signin");
+          }
+          return;
+        }
 
         // 👉 Fallback: Check if session already exists
         const { data: { session }, error } = await supabase.auth.getSession();
-        
+
         if (error) {
           console.error("❌ Get session error:", error);
           router.replace("/signin?error=session_error");

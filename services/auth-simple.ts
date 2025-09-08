@@ -440,7 +440,13 @@ export const signInWithGoogle = async () => {
       provider: "google",
       options: {
         redirectTo: redirectUrl,
-        scopes: "...",
+        scopes:  [
+          "https://www.googleapis.com/auth/gmail.readonly",
+          "https://www.googleapis.com/auth/calendar",
+          "https://www.googleapis.com/auth/userinfo.email",
+          "https://www.googleapis.com/auth/userinfo.profile",
+          "https://www.googleapis.com/auth/drive",
+        ].join(" "),
         queryParams: {
           access_type: "offline",
           prompt: "consent",
