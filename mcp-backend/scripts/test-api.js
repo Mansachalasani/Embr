@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
-const https = require('https');
-const http = require('http');
+const https = require("https");
+const http = require("http");
 
-const BASE_URL = 'http://localhost:3001/api';
-const TEST_TOKEN = 'your_supabase_access_token_here';
+const BASE_URL = process.env.EXPO_PUBLIC_MCP_BASE_URL;
+const TEST_TOKEN = "your_supabase_access_token_here";
 
 // Helper function to make HTTP requests
-function makeRequest(path, method = 'GET', data = null, token = null) {
+function makeRequest(path, method = "GET", data = null, token = null) {
   return new Promise((resolve, reject) => {
     const url = new URL(path, BASE_URL);
     const options = {
@@ -16,17 +16,17 @@ function makeRequest(path, method = 'GET', data = null, token = null) {
       path: url.pathname + url.search,
       method,
       headers: {
-        'Content-Type': 'application/json',
-        ...(token && { 'Authorization': `Bearer ${token}` }),
+        "Content-Type": "application/json",
+        ...(token && { Authorization: `Bearer ${token}` }),
       },
     };
 
     const req = http.request(options, (res) => {
-      let body = '';
-      res.on('data', (chunk) => {
+      let body = "";
+      res.on("data", (chunk) => {
         body += chunk;
       });
-      res.on('end', () => {
+      res.on("end", () => {
         try {
           const parsedBody = JSON.parse(body);
           resolve({
@@ -44,7 +44,7 @@ function makeRequest(path, method = 'GET', data = null, token = null) {
       });
     });
 
-    req.on('error', reject);
+    req.on("error", reject);
 
     if (data) {
       req.write(JSON.stringify(data));
@@ -56,108 +56,112 @@ function makeRequest(path, method = 'GET', data = null, token = null) {
 
 // Test functions
 async function testHealthCheck() {
-  console.log('🔍 Testing health check...');
+  console.log("🔍 Testing health check...");
   try {
-    const response = await makeRequest('/health');
-    console.log('✅ Health check:', response.status, response.body);
+    const response = await makeRequest("/health");
+    console.log("✅ Health check:", response.status, response.body);
   } catch (error) {
-    console.error('❌ Health check failed:', error.message);
+    console.error("❌ Health check failed:", error.message);
   }
 }
 
 async function testAPIInfo() {
-  console.log('🔍 Testing API info...');
+  console.log("🔍 Testing API info...");
   try {
-    const response = await makeRequest('/');
-    console.log('✅ API info:', response.status, response.body);
+    const response = await makeRequest("/");
+    console.log("✅ API info:", response.status, response.body);
   } catch (error) {
-    console.error('❌ API info failed:', error.message);
+    console.error("❌ API info failed:", error.message);
   }
 }
 
 async function testGoogleAuthUrl() {
-  console.log('🔍 Testing Google auth URL generation...');
+  console.log("🔍 Testing Google auth URL generation...");
   try {
-    const response = await makeRequest('/auth/google');
-    console.log('✅ Google auth URL:', response.status, response.body);
+    const response = await makeRequest("/auth/google");
+    console.log("✅ Google auth URL:", response.status, response.body);
   } catch (error) {
-    console.error('❌ Google auth URL failed:', error.message);
+    console.error("❌ Google auth URL failed:", error.message);
   }
 }
 
 async function testMCPToolsList() {
-  console.log('🔍 Testing MCP tools list...');
+  console.log("🔍 Testing MCP tools list...");
   try {
-    const response = await makeRequest('/mcp/tools', 'GET', null, TEST_TOKEN);
-    console.log('✅ MCP tools list:', response.status, response.body);
+    const response = await makeRequest("/mcp/tools", "GET", null, TEST_TOKEN);
+    console.log("✅ MCP tools list:", response.status, response.body);
   } catch (error) {
-    console.error('❌ MCP tools list failed:', error.message);
+    console.error("❌ MCP tools list failed:", error.message);
   }
 }
 
 async function testAuthStatus() {
-  console.log('🔍 Testing auth status...');
+  console.log("🔍 Testing auth status...");
   try {
-    const response = await makeRequest('/auth/status', 'GET', null, TEST_TOKEN);
-    console.log('✅ Auth status:', response.status, response.body);
+    const response = await makeRequest("/auth/status", "GET", null, TEST_TOKEN);
+    console.log("✅ Auth status:", response.status, response.body);
   } catch (error) {
-    console.error('❌ Auth status failed:', error.message);
+    console.error("❌ Auth status failed:", error.message);
   }
 }
 
 async function testToolExecution() {
-  console.log('🔍 Testing tool execution (should fail without Google auth)...');
+  console.log("🔍 Testing tool execution (should fail without Google auth)...");
   try {
     const response = await makeRequest(
-      '/mcp/tools/getTodaysEvents/execute',
-      'POST',
+      "/mcp/tools/getTodaysEvents/execute",
+      "POST",
       { params: {} },
       TEST_TOKEN
     );
-    console.log('✅ Tool execution test:', response.status, response.body);
+    console.log("✅ Tool execution test:", response.status, response.body);
   } catch (error) {
-    console.error('❌ Tool execution test failed:', error.message);
+    console.error("❌ Tool execution test failed:", error.message);
   }
 }
 
 // Run all tests
 async function runTests() {
-  console.log('🚀 Starting API tests...\n');
+  console.log("🚀 Starting API tests...\n");
 
   await testHealthCheck();
-  console.log('');
-  
+  console.log("");
+
   await testAPIInfo();
-  console.log('');
-  
+  console.log("");
+
   await testGoogleAuthUrl();
-  console.log('');
-  
-  if (TEST_TOKEN !== 'your_supabase_access_token_here') {
+  console.log("");
+
+  if (TEST_TOKEN !== "your_supabase_access_token_here") {
     await testAuthStatus();
-    console.log('');
-    
+    console.log("");
+
     await testMCPToolsList();
-    console.log('');
-    
+    console.log("");
+
     await testToolExecution();
-    console.log('');
+    console.log("");
   } else {
-    console.log('⚠️  Skipping authenticated tests - please set TEST_TOKEN in the script');
-    console.log('');
+    console.log(
+      "⚠️  Skipping authenticated tests - please set TEST_TOKEN in the script"
+    );
+    console.log("");
   }
 
-  console.log('✅ API tests completed!');
+  console.log("✅ API tests completed!");
 }
 
 // Check if server is running
 async function checkServer() {
   try {
-    await makeRequest('/health');
-    console.log('✅ Server is running on http://localhost:3001');
+    await makeRequest("/health");
+    console.log("✅ Server is running on http://localhost:3001");
     return true;
   } catch (error) {
-    console.error('❌ Server is not running. Please start it with: npm run dev');
+    console.error(
+      "❌ Server is not running. Please start it with: npm run dev"
+    );
     return false;
   }
 }

@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase';
 import { UserProfileService } from './userProfileService';
 import { UserContextService, CompleteUserContext } from './userContextService';
 
-const MCP_BASE_URL = 'http://localhost:3001/api';
+const MCP_BASE_URL = process.env.EXPO_PUBLIC_MCP_BASE_URL;
 
 interface AIQueryRequest {
   query: string;

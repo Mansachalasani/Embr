@@ -26,7 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         // For web, first check if there's a session in the URL
         if (Platform.OS === 'web') {
-          const { data, error } = await supabase.auth.getSessionFromUrl();
+          const { data, error } = await supabase.auth.getSession();
           if (error) {
             console.log('🔍 AuthContext: Error getting session from URL:', error);
           } else if (data?.session) {
