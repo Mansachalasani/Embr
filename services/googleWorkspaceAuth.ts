@@ -1,7 +1,7 @@
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '../lib/supabase';
 
-const MCP_BASE_URL = 'http://localhost:3001/api';
+const MCP_BASE_URL = process.env.EXPO_PUBLIC_MCP_BASE_URL;
 
 export class GoogleWorkspaceAuth {
   static async getAuthUrl(): Promise<string | null> {

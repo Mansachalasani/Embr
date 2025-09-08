@@ -15,7 +15,7 @@ export interface StreamingCallbacks {
   onError?: (error: string) => void;
 }
 
-const MCP_BASE_URL = 'http://localhost:3001/api';
+const MCP_BASE_URL = process.env.EXPO_PUBLIC_MCP_BASE_URL;
 
 export class StreamingService {
   private eventSource: EventSource | null = null;

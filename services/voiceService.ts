@@ -4,7 +4,7 @@ import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
 import { Buffer } from 'buffer';
 
-const MCP_BASE_URL = 'http://localhost:3001/api';
+const MCP_BASE_URL = process.env.EXPO_PUBLIC_MCP_BASE_URL;
 
 export interface VoiceResponse {
   success: boolean;
