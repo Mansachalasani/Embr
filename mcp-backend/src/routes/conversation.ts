@@ -185,18 +185,13 @@ router.post('/speak', authenticateToken, upload.single('audio'), async (req: Aut
     }
     console.log('🔍 Detected audio format:', detectedFormat);
     
-    // Try base64 approach first if it's available in the body
-    let speechResult;
-    if (req.body.base64String) {
-      console.log('🔧 Using base64 audio processing...');
-      speechResult = await (speechService as any).speechToTextFromBase64(req.body.base64String);
-    } else {
-      console.log('🔧 Using buffer stream processing...');
-      const audioBuffer = req.file.buffer;
-      const audioStream = require('stream').Readable.from(audioBuffer);
-      console.log('📊 Audio buffer size:', audioBuffer.length, 'bytes');
-      speechResult = await speechService.speechToText(audioStream);
-    }
+    // Use enhanced speech processing with automatic format conversion
+    console.log('🔧 Using enhanced audio processing with format conversion...');
+    const audioBuffer = req.file.buffer;
+    const mimeType = req.file.mimetype;
+    console.log('📊 Audio details:', { size: audioBuffer.length, mimeType });
+    
+    const speechResult = await (speechService as any).speechToTextWithConversion(audioBuffer, mimeType);
     
     if (!speechResult.success || !speechResult.text) {
       return res.status(400).json({
@@ -490,11 +485,23 @@ router.post('/test-audio', authenticateToken, upload.single('audio'), async (req
       base64Length: req.body.base64String ? req.body.base64String.length : 0
     });
     
-    // Test both approaches
+    // Test enhanced audio processing
     const results = {
+      enhanced: null as any,
       bufferStream: null as any,
       base64: null as any,
     };
+    
+    // Test enhanced approach with format conversion
+    try {
+      console.log('🧪 Testing enhanced audio processing...');
+      const audioBuffer = req.file.buffer;
+      const mimeType = req.file.mimetype;
+      results.enhanced = await (speechService as any).speechToTextWithConversion(audioBuffer, mimeType);
+    } catch (error) {
+      console.error('❌ Enhanced test failed:', error);
+      results.enhanced = { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
     
     // Test buffer stream approach
     try {

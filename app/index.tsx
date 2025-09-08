@@ -19,11 +19,27 @@ export default function Index() {
 
   const checkOnboardingStatus = async () => {
     try {
+      console.log('🔍 Checking onboarding status...');
       const result = await UserPreferencesService.getUserPreferences();
-      setOnboardingCompleted(result.onboarding_completed);
+      console.log('📊 Onboarding status result:', result);
+      console.log('📊 onboarding_completed value:', result.onboarding_completed);
+      console.log('📊 typeof onboarding_completed:', typeof result.onboarding_completed);
+      console.log('📊 service success:', result.success);
+      
+      // If service call was successful, use the onboarding_completed value
+      // If service call failed, default to false to show onboarding
+      if (result.success) {
+        console.log('✅ Service call successful, using onboarding status:', result.onboarding_completed);
+        setOnboardingCompleted(result.onboarding_completed);
+      } else {
+        console.log('❌ Service call failed, defaulting to show onboarding');
+        setOnboardingCompleted(false);
+      }
+      
     } catch (error) {
-      console.error('Error checking onboarding status:', error);
+      console.error('❌ Error checking onboarding status:', error);
       // Default to showing onboarding if there's an error
+      console.log('🔄 Setting onboarding to false due to error');
       setOnboardingCompleted(false);
     } finally {
       setCheckingPreferences(false);

@@ -2,7 +2,7 @@
 import { supabase } from '../lib/supabase';
 import { UserPersonalizationData, UserPreferenceUpdatePayload } from '../types/userPreferences';
 
-const MCP_BASE_URL = process.env.EXPO_PUBLIC_MCP_BASE_URL || process.env.EXPO_PUBLIC_MCP_BASE_URL;
+const MCP_BASE_URL = process.env.EXPO_PUBLIC_MCP_BASE_URL;
 
 export class UserPreferencesService {
   /**
@@ -15,11 +15,15 @@ export class UserPreferencesService {
     error?: string;
   }> {
     try {
+      console.log('🔍 UserPreferencesService: Getting user preferences...');
+      console.log('🌐 Using MCP_BASE_URL:', MCP_BASE_URL);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
+        console.log('❌ No active session found');
         throw new Error('No active session');
       }
 
+      console.log('📡 Making request to:', `${MCP_BASE_URL}/user/preferences`);
       const response = await fetch(`${MCP_BASE_URL}/user/preferences`, {
         method: 'GET',
         headers: {
@@ -28,12 +32,18 @@ export class UserPreferencesService {
         },
       });
 
+      console.log('📡 Response status:', response.status, response.statusText);
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error('❌ HTTP error:', errorData);
         throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log('📊 Backend response data:', data);
+      console.log('📊 onboarding_completed from backend:', data.onboarding_completed);
+      
       return {
         success: true,
         preferences: data.preferences,
@@ -41,6 +51,7 @@ export class UserPreferencesService {
       };
     } catch (error) {
       console.error('❌ Error fetching user preferences:', error);
+      console.log('🔄 Returning error response with onboarding_completed: false');
       return {
         success: false,
         preferences: null,

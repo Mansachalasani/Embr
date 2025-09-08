@@ -406,17 +406,21 @@ export const signInWithGoogle = async () => {
 
     if (Platform.OS === "web") {
       // 👉 Web flow: Supabase will handle session automatically
+      const requestedScopes = [
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/calendar.readonly",
+        "https://www.googleapis.com/auth/userinfo.email", 
+        "https://www.googleapis.com/auth/userinfo.profile",
+        "https://www.googleapis.com/auth/drive",
+      ].join(" ");
+      
+      console.log("🔍 Web: Requesting scopes:", requestedScopes);
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`, // or index.html
-          scopes: [
-            "https://www.googleapis.com/auth/gmail.readonly",
-            "https://www.googleapis.com/auth/calendar",
-            "https://www.googleapis.com/auth/userinfo.email",
-            "https://www.googleapis.com/auth/userinfo.profile",
-            "https://www.googleapis.com/auth/drive",
-          ].join(" "),
+          scopes: requestedScopes,
           queryParams: {
             access_type: "offline",
             prompt: "consent",
@@ -436,17 +440,21 @@ export const signInWithGoogle = async () => {
     });
     console.log("📍 Redirect URL generated:", redirectUrl);
 
+    const requestedScopes = [
+      "https://www.googleapis.com/auth/gmail.readonly",
+      "https://www.googleapis.com/auth/calendar",
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile",
+      "https://www.googleapis.com/auth/drive",
+    ].join(" ");
+    
+    console.log("🔍 Native: Requesting scopes:", requestedScopes);
+    
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: redirectUrl,
-        scopes:  [
-          "https://www.googleapis.com/auth/gmail.readonly",
-          "https://www.googleapis.com/auth/calendar",
-          "https://www.googleapis.com/auth/userinfo.email",
-          "https://www.googleapis.com/auth/userinfo.profile",
-          "https://www.googleapis.com/auth/drive",
-        ].join(" "),
+        scopes: requestedScopes,
         queryParams: {
           access_type: "offline",
           prompt: "consent",
