@@ -431,8 +431,8 @@ export const signInWithGoogle = async () => {
 
     // 👉 Native (Expo) flow
     const redirectUrl = AuthSession.makeRedirectUri({
-      useProxy: true,
-      preferLocalhost: false,
+      scheme: 'embr',
+      path: 'auth/callback',
     });
     console.log("📍 Redirect URL generated:", redirectUrl);
 
@@ -455,26 +455,89 @@ export const signInWithGoogle = async () => {
     });
     if (error) throw error;
 
+    console.log("🔗 Opening auth URL:", data.url);
     const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+    
+    console.log("🔄 Browser result:", result);
+    
     if (result.type !== "success") {
       console.log("⚠️ Auth cancelled:", result.type);
       return result;
     }
 
-    // Parse tokens only for native
-    const urlParams = new URLSearchParams(result.url.split("#")[1]);
-    const access_token = urlParams.get("access_token");
-    const refresh_token = urlParams.get("refresh_token");
+    console.log("✅ Auth success - parsing tokens from:", result.url);
 
-    if (!access_token || !refresh_token) {
-      throw new Error("Missing tokens in callback");
+    // Parse tokens from URL - handle both hash and query params
+    let access_token, refresh_token, provider_token, provider_refresh_token;
+    
+    try {
+      // Try hash first (most common for Supabase OAuth)
+      const hashPart = result.url.split("#")[1];
+      if (hashPart) {
+        const hashParams = new URLSearchParams(hashPart);
+        access_token = hashParams.get("access_token");
+        refresh_token = hashParams.get("refresh_token");
+        provider_token = hashParams.get("provider_token");
+        provider_refresh_token = hashParams.get("provider_refresh_token");
+      }
+      
+      // Fallback to query params if no hash tokens
+      if (!access_token) {
+        const url = new URL(result.url);
+        access_token = url.searchParams.get("access_token");
+        refresh_token = url.searchParams.get("refresh_token");
+        provider_token = url.searchParams.get("provider_token");
+        provider_refresh_token = url.searchParams.get("provider_refresh_token");
+      }
+      
+      console.log("🔑 Parsed tokens:", {
+        access_token: access_token ? "Yes" : "No",
+        refresh_token: refresh_token ? "Yes" : "No",
+        provider_token: provider_token ? "Yes" : "No",
+        provider_refresh_token: provider_refresh_token ? "Yes" : "No",
+      });
+
+    } catch (parseError) {
+      console.error("❌ Error parsing callback URL:", parseError);
+      throw new Error("Failed to parse authentication callback");
     }
 
-    const { data: sessionData, error: sessionError } =
-      await supabase.auth.setSession({ access_token, refresh_token });
-    if (sessionError) throw sessionError;
+    if (!access_token) {
+      console.error("❌ No access token found in callback URL:", result.url);
+      throw new Error("No access token received from OAuth callback");
+    }
 
-    return { type: "success", session: sessionData.session };
+    // Set Supabase session
+    const { data: sessionData, error: sessionError } = await supabase.auth.setSession({ 
+      access_token, 
+      refresh_token: refresh_token || '' 
+    });
+    
+    if (sessionError) {
+      console.error("❌ Session error:", sessionError);
+      throw sessionError;
+    }
+
+    console.log("✅ Session created successfully for user:", sessionData?.user?.email);
+
+    // Save provider tokens if available
+    if (sessionData.session?.user && (provider_token || provider_refresh_token)) {
+      try {
+        await saveUserProfile(sessionData.session.user, {
+          providerToken: provider_token,
+          providerRefreshToken: provider_refresh_token,
+        });
+      } catch (profileError) {
+        console.warn("⚠️ Failed to save provider tokens:", profileError);
+      }
+    }
+
+    return { 
+      type: "success", 
+      session: sessionData.session,
+      provider_token,
+      provider_refresh_token 
+    };
   } catch (err: any) {
     console.error("💥 Sign in error:", err);
     throw new Error(`Google Sign In failed: ${err.message}`);
