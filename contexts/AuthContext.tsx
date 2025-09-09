@@ -78,18 +78,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (loading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const isCallbackRoute = segments.includes('callback');
 
     if (session && !user) {
       // Session exists but user is null, wait for user to be set
       return;
     }
 
+    // Don't redirect if we're currently on the callback route
+    if (isCallbackRoute) {
+      console.log('🔄 On callback route, skipping auto-redirect');
+      return;
+    }
+
     if (!session && !inAuthGroup) {
       // User is not signed in and not in auth group, redirect to sign in
       console.log('🔄 Redirecting to auth (user signed out)');
-      router.replace('/(auth)');
-    } else if (session && inAuthGroup) {
-      // User is signed in but still in auth group, redirect to main app
+      router.replace('/(auth)/signin');
+    } else if (session && inAuthGroup && !isCallbackRoute) {
+      // User is signed in but still in auth group (and not on callback), redirect to main app
       console.log('🔄 Redirecting to tabs (user signed in)');
       router.replace('/(tabs)');
     }

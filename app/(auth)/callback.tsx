@@ -22,7 +22,7 @@
 
 //   return null; // no UI needed
 // }
-// app/auth/callback.tsx
+
 import { useEffect } from "react";
 import { useRouter } from "expo-router";
 import { supabase } from "../../lib/supabase";

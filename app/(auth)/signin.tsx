@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { signInWithGoogle } from '../../services/auth-simple';
 import { useTheme } from '../../contexts/ThemeContext';
+import { router, useLocalSearchParams } from 'expo-router';
 
 const { width, height } = Dimensions.get('window');
 
@@ -24,6 +25,19 @@ export default function SignIn() {
   const [loading, setLoading] = useState(false);
   const fadeAnim = new Animated.Value(0);
   const slideAnim = new Animated.Value(50);
+  const { error } = useLocalSearchParams();
+
+  useEffect(() => {
+    // Show error alert if coming from callback with error
+    if (error) {
+      const errorMessage = Array.isArray(error) ? error[0] : error;
+      Alert.alert(
+        'Authentication Error',
+        `Sign in failed: ${decodeURIComponent(errorMessage)}\n\nPlease try again.`,
+        [{ text: 'OK' }]
+      );
+    }
+  }, [error]);
 
   useEffect(() => {
     Animated.parallel([
@@ -319,8 +333,8 @@ export default function SignIn() {
           >
             <Text style={styles.footerText}>
               By signing in, you agree to our Terms of Service{'\n'}
-              and Privacy Policy. Welcome to the future! 🚀
-            </Text>
+              and</Text> <TouchableOpacity style={{}} onPress={()=>router.push('/auth/privacy-policy')}><Text style={{color:'red'}}>Privacy Policy</Text></TouchableOpacity><Text style={styles.footerText}>Welcome to the future! 🚀</Text>
+            
           </Animated.View>
         </ScrollView>
       </SafeAreaView>

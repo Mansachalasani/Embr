@@ -308,249 +308,249 @@ const saveUserProfile = async (user: User, googleTokens: GoogleTokens) => {
 // };
 
 
-// export const signInWithGoogle = async () => {
-//   try {
-//     console.log("🚀 Starting Google Sign In with proper scopes...");
-
-//     // Step 1: Redirect URL - Dynamic based on platform and environment
-//     const redirectUrl = Platform.OS === 'web' 
-//       ? `${window.location.origin}/auth/callback`
-//       : AuthSession.makeRedirectUri({
-//           useProxy: true,
-//           preferLocalhost: false, // Allow dynamic detection
-//         });
-//     console.log("📍 Redirect URL generated:", redirectUrl);
-
-//     // Step 2: Supabase OAuth options
-//     const oauthOptions = {
-//       provider: "google" as const,
-//       options: {
-//         redirectTo: redirectUrl,
-//         scopes: [
-//           "https://www.googleapis.com/auth/gmail.readonly",
-//           "https://www.googleapis.com/auth/calendar",
-//           "https://www.googleapis.com/auth/userinfo.email",
-//           "https://www.googleapis.com/auth/userinfo.profile",
-//           "https://www.googleapis.com/auth/drive", 
-//         ].join(" "),
-//         queryParams: {
-//           access_type: "offline", // 🔑 ensures refresh_token
-//           prompt: "consent",      // 🔑 forces Google to reissue it
-//         },
-//       },
-//     };
-
-//     // Step 3: Get Supabase OAuth URL
-//     const { data, error } = await supabase.auth.signInWithOAuth(oauthOptions);
-//     if (error) throw error;
-//     if (!data?.url) throw new Error("No OAuth URL returned from Supabase");
-
-//     // Step 4: Open OAuth session
-//     const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
-//     if (result.type !== "success") {
-//       console.log("⚠️ Auth failed or cancelled:", result.type);
-//       return result;
-//     }
-
-//     console.log("✅ Browser returned success!");
-//     console.log("🎯 Callback URL:", result.url);
-
-//     // Step 5: Extract tokens from callback URL fragment
-//     const urlParams = new URLSearchParams(result.url.split("#")[1]);
-//     const access_token = urlParams.get("access_token");
-//     const refresh_token = urlParams.get("refresh_token");
-//     const provider_token = urlParams.get("provider_token");
-//     const provider_refresh_token = urlParams.get("provider_refresh_token");
-
-//     if (!access_token) throw new Error("No access token found in callback URL");
-
-//     console.log("🔑 Parsed tokens:", {
-//       access_token: !!access_token,
-//       refresh_token: !!refresh_token,
-//       provider_token: !!provider_token,
-//       provider_refresh_token: !!provider_refresh_token,
-//     });
-
-//     // Step 6: Store Supabase session (auth works with access/refresh)
-//     const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-//       access_token,
-//       refresh_token,
-//     });
-//     if (sessionError) throw sessionError;
-
-//     // Step 7: Persist provider tokens (Gmail/Calendar usage)
-//     if (sessionData.session?.user) {
-//       await saveUserProfile(sessionData.session.user, {
-//         providerToken: provider_token,
-//         providerRefreshToken: provider_refresh_token,
-//       });
-//     }
-
-//     return {
-//       type: "success",
-//       session: sessionData.session,
-//       provider_token,
-//       provider_refresh_token,
-//     };
-//   } catch (err) {
-//     console.error("💥 Sign in error:", err);
-//     throw new Error(`Google Sign In failed: ${err.message}`);
-//   }
-// };
-
-
-
 export const signInWithGoogle = async () => {
   try {
-    console.log("🚀 Starting Google Sign In...");
+    console.log("🚀 Starting Google Sign In with proper scopes...");
 
-    if (Platform.OS === "web") {
-      // 👉 Web flow: Supabase will handle session automatically
-      const requestedScopes = [
-        "https://www.googleapis.com/auth/gmail.readonly",
-        "https://www.googleapis.com/auth/calendar.readonly",
-        "https://www.googleapis.com/auth/userinfo.email", 
-        "https://www.googleapis.com/auth/userinfo.profile",
-        "https://www.googleapis.com/auth/drive",
-      ].join(" ");
-      
-      console.log("🔍 Web: Requesting scopes:", requestedScopes);
-      
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`, // or index.html
-          scopes: requestedScopes,
-          queryParams: {
-            access_type: "offline",
-            prompt: "consent",
-          },
-        },
-      });
-      if (error) throw error;
-
-      // Don’t parse tokens yourself here — Supabase will do it on redirect
-      return;
-    }
-
-    // 👉 Native (Expo) flow
-    const redirectUrl = AuthSession.makeRedirectUri({
-      scheme: 'embr',
-      path: 'auth/callback',
-    });
+    // Step 1: Redirect URL - Dynamic based on platform and environment
+    const redirectUrl = Platform.OS === 'web' 
+      ? `${window.location.origin}/auth/callback`
+      : AuthSession.makeRedirectUri({
+          useProxy: true,
+          preferLocalhost: false, // Allow dynamic detection
+        });
     console.log("📍 Redirect URL generated:", redirectUrl);
 
-    const requestedScopes = [
-      "https://www.googleapis.com/auth/gmail.readonly",
-      "https://www.googleapis.com/auth/calendar",
-      "https://www.googleapis.com/auth/userinfo.email",
-      "https://www.googleapis.com/auth/userinfo.profile",
-      "https://www.googleapis.com/auth/drive",
-    ].join(" ");
-    
-    console.log("🔍 Native: Requesting scopes:", requestedScopes);
-    
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
+    // Step 2: Supabase OAuth options
+    const oauthOptions = {
+      provider: "google" as const,
       options: {
         redirectTo: redirectUrl,
-        scopes: requestedScopes,
+        scopes: [
+          "https://www.googleapis.com/auth/gmail.readonly",
+          "https://www.googleapis.com/auth/calendar",
+          "https://www.googleapis.com/auth/userinfo.email",
+          "https://www.googleapis.com/auth/userinfo.profile",
+          "https://www.googleapis.com/auth/drive", 
+        ].join(" "),
         queryParams: {
-          access_type: "offline",
-          prompt: "consent",
+          access_type: "offline", // 🔑 ensures refresh_token
+          prompt: "consent",      // 🔑 forces Google to reissue it
         },
       },
-    });
-    if (error) throw error;
+    };
 
-    console.log("🔗 Opening auth URL:", data.url);
+    // Step 3: Get Supabase OAuth URL
+    const { data, error } = await supabase.auth.signInWithOAuth(oauthOptions);
+    if (error) throw error;
+    if (!data?.url) throw new Error("No OAuth URL returned from Supabase");
+
+    // Step 4: Open OAuth session
     const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
-    
-    console.log("🔄 Browser result:", result);
-    
     if (result.type !== "success") {
-      console.log("⚠️ Auth cancelled:", result.type);
+      console.log("⚠️ Auth failed or cancelled:", result.type);
       return result;
     }
 
-    console.log("✅ Auth success - parsing tokens from:", result.url);
+    console.log("✅ Browser returned success!");
+    console.log("🎯 Callback URL:", result.url);
 
-    // Parse tokens from URL - handle both hash and query params
-    let access_token, refresh_token, provider_token, provider_refresh_token;
-    
-    try {
-      // Try hash first (most common for Supabase OAuth)
-      const hashPart = result.url.split("#")[1];
-      if (hashPart) {
-        const hashParams = new URLSearchParams(hashPart);
-        access_token = hashParams.get("access_token");
-        refresh_token = hashParams.get("refresh_token");
-        provider_token = hashParams.get("provider_token");
-        provider_refresh_token = hashParams.get("provider_refresh_token");
-      }
-      
-      // Fallback to query params if no hash tokens
-      if (!access_token) {
-        const url = new URL(result.url);
-        access_token = url.searchParams.get("access_token");
-        refresh_token = url.searchParams.get("refresh_token");
-        provider_token = url.searchParams.get("provider_token");
-        provider_refresh_token = url.searchParams.get("provider_refresh_token");
-      }
-      
-      console.log("🔑 Parsed tokens:", {
-        access_token: access_token ? "Yes" : "No",
-        refresh_token: refresh_token ? "Yes" : "No",
-        provider_token: provider_token ? "Yes" : "No",
-        provider_refresh_token: provider_refresh_token ? "Yes" : "No",
-      });
+    // Step 5: Extract tokens from callback URL fragment
+    const urlParams = new URLSearchParams(result.url.split("#")[1]);
+    const access_token = urlParams.get("access_token");
+    const refresh_token = urlParams.get("refresh_token");
+    const provider_token = urlParams.get("provider_token");
+    const provider_refresh_token = urlParams.get("provider_refresh_token");
 
-    } catch (parseError) {
-      console.error("❌ Error parsing callback URL:", parseError);
-      throw new Error("Failed to parse authentication callback");
-    }
+    if (!access_token) throw new Error("No access token found in callback URL");
 
-    if (!access_token) {
-      console.error("❌ No access token found in callback URL:", result.url);
-      throw new Error("No access token received from OAuth callback");
-    }
-
-    // Set Supabase session
-    const { data: sessionData, error: sessionError } = await supabase.auth.setSession({ 
-      access_token, 
-      refresh_token: refresh_token || '' 
+    console.log("🔑 Parsed tokens:", {
+      access_token: !!access_token,
+      refresh_token: !!refresh_token,
+      provider_token: !!provider_token,
+      provider_refresh_token: !!provider_refresh_token,
     });
-    
-    if (sessionError) {
-      console.error("❌ Session error:", sessionError);
-      throw sessionError;
+
+    // Step 6: Store Supabase session (auth works with access/refresh)
+    const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+      access_token,
+      refresh_token,
+    });
+    if (sessionError) throw sessionError;
+
+    // Step 7: Persist provider tokens (Gmail/Calendar usage)
+    if (sessionData.session?.user) {
+      await saveUserProfile(sessionData.session.user, {
+        providerToken: provider_token,
+        providerRefreshToken: provider_refresh_token,
+      });
     }
 
-    console.log("✅ Session created successfully for user:", sessionData?.user?.email);
-
-    // Save provider tokens if available
-    if (sessionData.session?.user && (provider_token || provider_refresh_token)) {
-      try {
-        await saveUserProfile(sessionData.session.user, {
-          providerToken: provider_token,
-          providerRefreshToken: provider_refresh_token,
-        });
-      } catch (profileError) {
-        console.warn("⚠️ Failed to save provider tokens:", profileError);
-      }
-    }
-
-    return { 
-      type: "success", 
+    return {
+      type: "success",
       session: sessionData.session,
       provider_token,
-      provider_refresh_token 
+      provider_refresh_token,
     };
-  } catch (err: any) {
+  } catch (err) {
     console.error("💥 Sign in error:", err);
     throw new Error(`Google Sign In failed: ${err.message}`);
   }
 };
+
+
+
+// export const signInWithGoogle = async () => {
+//   try {
+//     console.log("🚀 Starting Google Sign In...");
+
+//     if (Platform.OS === "web") {
+//       // 👉 Web flow: Supabase will handle session automatically
+//       const requestedScopes = [
+//         "https://www.googleapis.com/auth/gmail.readonly",
+//         "https://www.googleapis.com/auth/calendar.readonly",
+//         "https://www.googleapis.com/auth/userinfo.email", 
+//         "https://www.googleapis.com/auth/userinfo.profile",
+//         "https://www.googleapis.com/auth/drive",
+//       ].join(" ");
+      
+//       console.log("🔍 Web: Requesting scopes:", requestedScopes);
+      
+//       const { error } = await supabase.auth.signInWithOAuth({
+//         provider: "google",
+//         options: {
+//           redirectTo: `${window.location.origin}/auth/callback`, // or index.html
+//           scopes: requestedScopes,
+//           queryParams: {
+//             access_type: "offline",
+//             prompt: "consent",
+//           },
+//         },
+//       });
+//       if (error) throw error;
+
+//       // Don’t parse tokens yourself here — Supabase will do it on redirect
+//       return;
+//     }
+
+//     // 👉 Native (Expo) flow
+//     const redirectUrl = AuthSession.makeRedirectUri({
+//       scheme: 'embr',
+//       path: 'auth/callback',
+//     });
+//     console.log("📍 Redirect URL generated:", redirectUrl);
+
+//     const requestedScopes = [
+//       "https://www.googleapis.com/auth/gmail.readonly",
+//       "https://www.googleapis.com/auth/calendar",
+//       "https://www.googleapis.com/auth/userinfo.email",
+//       "https://www.googleapis.com/auth/userinfo.profile",
+//       "https://www.googleapis.com/auth/drive",
+//     ].join(" ");
+    
+//     console.log("🔍 Native: Requesting scopes:", requestedScopes);
+    
+//     const { data, error } = await supabase.auth.signInWithOAuth({
+//       provider: "google",
+//       options: {
+//         redirectTo: redirectUrl,
+//         scopes: requestedScopes,
+//         queryParams: {
+//           access_type: "offline",
+//           prompt: "consent",
+//         },
+//       },
+//     });
+//     if (error) throw error;
+
+//     console.log("🔗 Opening auth URL:", data.url);
+//     const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+    
+//     console.log("🔄 Browser result:", result);
+    
+//     if (result.type !== "success") {
+//       console.log("⚠️ Auth cancelled:", result.type);
+//       return result;
+//     }
+
+//     console.log("✅ Auth success - parsing tokens from:", result.url);
+
+//     // Parse tokens from URL - handle both hash and query params
+//     let access_token, refresh_token, provider_token, provider_refresh_token;
+    
+//     try {
+//       // Try hash first (most common for Supabase OAuth)
+//       const hashPart = result.url.split("#")[1];
+//       if (hashPart) {
+//         const hashParams = new URLSearchParams(hashPart);
+//         access_token = hashParams.get("access_token");
+//         refresh_token = hashParams.get("refresh_token");
+//         provider_token = hashParams.get("provider_token");
+//         provider_refresh_token = hashParams.get("provider_refresh_token");
+//       }
+      
+//       // Fallback to query params if no hash tokens
+//       if (!access_token) {
+//         const url = new URL(result.url);
+//         access_token = url.searchParams.get("access_token");
+//         refresh_token = url.searchParams.get("refresh_token");
+//         provider_token = url.searchParams.get("provider_token");
+//         provider_refresh_token = url.searchParams.get("provider_refresh_token");
+//       }
+      
+//       console.log("🔑 Parsed tokens:", {
+//         access_token: access_token ? "Yes" : "No",
+//         refresh_token: refresh_token ? "Yes" : "No",
+//         provider_token: provider_token ? "Yes" : "No",
+//         provider_refresh_token: provider_refresh_token ? "Yes" : "No",
+//       });
+
+//     } catch (parseError) {
+//       console.error("❌ Error parsing callback URL:", parseError);
+//       throw new Error("Failed to parse authentication callback");
+//     }
+
+//     if (!access_token) {
+//       console.error("❌ No access token found in callback URL:", result.url);
+//       throw new Error("No access token received from OAuth callback");
+//     }
+
+//     // Set Supabase session
+//     const { data: sessionData, error: sessionError } = await supabase.auth.setSession({ 
+//       access_token, 
+//       refresh_token: refresh_token || '' 
+//     });
+    
+//     if (sessionError) {
+//       console.error("❌ Session error:", sessionError);
+//       throw sessionError;
+//     }
+
+//     console.log("✅ Session created successfully for user:", sessionData?.user?.email);
+
+//     // Save provider tokens if available
+//     if (sessionData.session?.user && (provider_token || provider_refresh_token)) {
+//       try {
+//         await saveUserProfile(sessionData.session.user, {
+//           providerToken: provider_token,
+//           providerRefreshToken: provider_refresh_token,
+//         });
+//       } catch (profileError) {
+//         console.warn("⚠️ Failed to save provider tokens:", profileError);
+//       }
+//     }
+
+//     return { 
+//       type: "success", 
+//       session: sessionData.session,
+//       provider_token,
+//       provider_refresh_token 
+//     };
+//   } catch (err: any) {
+//     console.error("💥 Sign in error:", err);
+//     throw new Error(`Google Sign In failed: ${err.message}`);
+//   }
+// };
 
 export const signOut = async () => {
   try {
