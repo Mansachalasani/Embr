@@ -207,6 +207,21 @@ export default function SignIn() {
       textAlign: 'center',
       lineHeight: 20,
     },
+    testAuthButton: {
+      backgroundColor: colors.surface,
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      borderRadius: 12,
+      marginTop: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    testAuthText: {
+      fontSize: 14,
+      color: colors.primary,
+      textAlign: 'center',
+      fontWeight: '500',
+    },
   });
 
   const features = [
@@ -332,9 +347,25 @@ export default function SignIn() {
             ]}
           >
             <Text style={styles.footerText}>
-              By signing in, you agree to our Terms of Service{'\n'}
-              and</Text> <TouchableOpacity style={{}} onPress={()=>router.push('/auth/privacy-policy')}><Text style={{color:'red'}}>Privacy Policy</Text></TouchableOpacity><Text style={styles.footerText}>Welcome to the future! 🚀</Text>
+              By signing in, you agree to our Terms of Service and{' '}
+              <Text 
+                style={[styles.footerText, { color: colors.primary, textDecorationLine: 'underline' }]}
+                onPress={() => router.push('/(auth)/privacy-policy')}
+              >
+                Privacy Policy
+              </Text>
+            </Text>
             
+            {/* <TouchableOpacity 
+              style={styles.testAuthButton}
+              onPress={() => router.push('/(auth)/test-auth')}
+            >
+              <Text style={styles.testAuthText}>🔍 Test OAuth Scopes</Text>
+            </TouchableOpacity> */}
+            
+            <Text style={[styles.footerText, { marginTop: 10 }]}>
+              Welcome to the future! 🚀
+            </Text>
           </Animated.View>
         </ScrollView>
       </SafeAreaView>

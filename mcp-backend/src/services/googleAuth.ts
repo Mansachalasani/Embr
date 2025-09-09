@@ -2,8 +2,10 @@ import { google } from 'googleapis';
 import { SupabaseService } from './supabase';
 
 const SCOPES = [
-  'https://www.googleapis.com/auth/calendar.readonly',
   'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/calendar',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.profile',
   'https://www.googleapis.com/auth/drive',
   'https://www.googleapis.com/auth/drive.file',
 ];
@@ -19,7 +21,8 @@ export class GoogleAuthService {
     return this.oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: SCOPES,
-      prompt: 'consent',
+      prompt: 'select_account consent',
+      include_granted_scopes: false,
     });
   }
 
