@@ -1407,10 +1407,9 @@ export function VoiceChat({
 
     // Check if we have a supported audio format on web
     if (Platform.OS === 'web' && !supportedAudioFormat) {
-      Alert.alert(
-        'Audio Not Supported',
-        'Your browser does not support audio recording. Please try using a different browser like Chrome or Firefox.',
-        [{ text: 'OK', style: 'default' }]
+      alert(
+        'Audio Not Supported Your browser does not support audio recording. Please try using a different browser like Chrome or Firefox.'
+       
       );
       return;
     }
@@ -1446,7 +1445,14 @@ export function VoiceChat({
     }
 
     // If processing or playing, do nothing
-    if (isProcessing || isPlaying) {
+    if (isProcessing ) {
+      return;
+    }
+    if( isPlaying ) {
+      // Stop playback if user taps while playing
+      await VoiceService.stopAudioPlayback();
+      setIsPlaying(false);
+      setIsRecording(true)
       return;
     }
 

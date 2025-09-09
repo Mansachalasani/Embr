@@ -89,6 +89,22 @@ export class VoiceService {
     }
   }
 
+  static async stopAudioPlayback(){
+    try {
+      console.log('🛑 Stopping any ongoing audio playback...');
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+      });
+      console.log('✅ Audio playback stopped');
+    }
+    catch(e){
+      console.error('❌ Error stopping audio playback:', e);
+    }
+  }
   /**
    * Enable conversational mode
    */
