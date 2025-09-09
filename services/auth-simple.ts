@@ -408,10 +408,11 @@ export const signInWithGoogle = async () => {
       // 👉 Web flow: Supabase will handle session automatically
       const requestedScopes = [
         "https://www.googleapis.com/auth/gmail.readonly",
-        "https://www.googleapis.com/auth/calendar.readonly",
+        "https://www.googleapis.com/auth/calendar",
         "https://www.googleapis.com/auth/userinfo.email", 
         "https://www.googleapis.com/auth/userinfo.profile",
         "https://www.googleapis.com/auth/drive",
+        "https://www.googleapis.com/auth/drive.file",
       ].join(" ");
       
       console.log("🔍 Web: Requesting scopes:", requestedScopes);
@@ -423,7 +424,8 @@ export const signInWithGoogle = async () => {
           scopes: requestedScopes,
           queryParams: {
             access_type: "offline",
-            prompt: "consent",
+            prompt: "select_account consent",
+            include_granted_scopes: "false",
           },
         },
       });
@@ -446,6 +448,7 @@ export const signInWithGoogle = async () => {
       "https://www.googleapis.com/auth/userinfo.email",
       "https://www.googleapis.com/auth/userinfo.profile",
       "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.file",
     ].join(" ");
     
     console.log("🔍 Native: Requesting scopes:", requestedScopes);
@@ -457,7 +460,8 @@ export const signInWithGoogle = async () => {
         scopes: requestedScopes,
         queryParams: {
           access_type: "offline",
-          prompt: "consent",
+          prompt: "select_account consent",
+          include_granted_scopes: "false",
         },
       },
     });

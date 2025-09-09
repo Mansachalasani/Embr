@@ -12,7 +12,14 @@ export const signInWithGoogleFallback = async () => {
 
     const request = new AuthSession.AuthRequest({
       clientId: '277683829604-lr21bqtsatm0eicaephloms8udij401v.apps.googleusercontent.com',
-      scopes: ['openid', 'profile', 'email'],
+      scopes:[
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/calendar",
+        "https://www.googleapis.com/auth/userinfo.email", 
+        "https://www.googleapis.com/auth/userinfo.profile",
+        "https://www.googleapis.com/auth/drive",
+        "https://www.googleapis.com/auth/drive.file",
+      ],
       redirectUri: AuthSession.makeRedirectUri({
         useProxy: true,
         preferLocalhost: true,
