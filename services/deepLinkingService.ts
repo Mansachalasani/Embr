@@ -299,7 +299,7 @@ export class DeepLinkingService {
     {
       name: 'Open WhatsApp',
       description: 'Open WhatsApp or send message to contact',
-      keywords: ['whatsapp', 'whats app', 'wa', 'message on whatsapp'],
+      keywords: ['whatsapp', 'message on whatsapp'],
       execute: async (query: string) => {
         const phoneMatch = query.match(/whatsapp\s+(\+?\d[\d\s\-()]+)/i);
         const phoneNumber = phoneMatch ? phoneMatch[1].replace(/[^\d+]/g, '') : null;

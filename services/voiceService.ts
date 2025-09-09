@@ -594,12 +594,31 @@ async speechToTextFromBase64(base64Audio: string): Promise<{
       }
 
       // Handle new JSON response format with full content
-      const hasAudio = response.headers.get('X-Has-Audio') === 'true';
-      
-      if (hasAudio) {
+     
+    
+      if (response.ok) {
         // New JSON format with full content
         const responseData = await response.json();
-        const audioData = new Uint8Array(responseData.audioData.data || responseData.audioData);
+        console.log('🔍 Full response data:', responseData);
+      
+      
+        // Handle different possible formats for audioData
+        let audioData;
+        if (responseData.audioData) {
+          if (responseData.audioData.data) {
+            // ArrayBuffer serialized as {type: 'Buffer', data: [...]}
+            audioData = new Uint8Array(responseData.audioData.data);
+          } else if (Array.isArray(responseData.audioData)) {
+            // Direct array format
+            audioData = new Uint8Array(responseData.audioData);
+          } else {
+            // Direct buffer format
+            audioData = new Uint8Array(responseData.audioData);
+          }
+        } else {
+          throw new Error('No audio data in response');
+        }
+        
         const userText = responseData.userText || '';
         const aiText = responseData.aiResponse || '';
         const toolUsed = responseData.toolUsed || '';
@@ -608,7 +627,8 @@ async speechToTextFromBase64(base64Audio: string): Promise<{
           userTextLength: userText.length,
           aiTextLength: aiText.length,
           audioDataLength: audioData.length,
-          toolUsed
+          toolUsed,
+          responseDataKeys: Object.keys(responseData)
         });
 
         console.log('🔊 Received audio response:', audioData.byteLength, 'bytes');
