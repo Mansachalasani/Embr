@@ -13,23 +13,32 @@ export default function AuthCallback() {
       try {
         console.log('🔄 Auth callback started');
         setStatus('Checking authentication...');
-
+  
         if (Platform.OS === 'web') {
           // Give Supabase a moment to process the URL parameters
           await new Promise(resolve => setTimeout(resolve, 1000));
           
-          // Check for URL parameters first
+          // Check for URL parameters and extract all tokens
           const urlParams = new URLSearchParams(window.location.search);
           const hashParams = new URLSearchParams(window.location.hash.substring(1));
           
           const error = urlParams.get('error') || hashParams.get('error');
+          const providerToken = urlParams.get('provider_token') || hashParams.get('provider_token');
+          const providerRefreshToken = urlParams.get('provider_refresh_token') || hashParams.get('provider_refresh_token');
+          
+          console.log('🔍 URL tokens extracted:', {
+            error: error,
+            providerToken: !!providerToken,
+            providerRefreshToken: !!providerRefreshToken
+          });
+          
           if (error) {
             console.error('❌ OAuth error in callback:', error);
             setStatus('Authentication failed');
             router.replace('/(auth)/signin?error=' + encodeURIComponent(error));
             return;
           }
-
+  
           console.log('🔍 Checking for session...');
           setStatus('Retrieving session...');
           
@@ -37,7 +46,7 @@ export default function AuthCallback() {
           let session = null;
           let attempts = 0;
           const maxAttempts = 5;
-
+  
           while (!session && attempts < maxAttempts) {
             attempts++;
             console.log(`🔄 Session check attempt ${attempts}/${maxAttempts}`);
@@ -52,8 +61,13 @@ export default function AuthCallback() {
                 return;
               }
             } else if (currentSession) {
+              
               session = currentSession;
-              console.log('✅ Session found:', session.user.email);
+              console.log('✅ Session found:', session);
+              await saveUserProfile(session.user, {
+                providerToken: session.provider_token,
+                providerRefreshToken: session.provider_refresh_token,
+              });
               break;
             }
             
@@ -62,10 +76,27 @@ export default function AuthCallback() {
               await new Promise(resolve => setTimeout(resolve, 1000));
             }
           }
-
+  
           if (session) {
             console.log('✅ Auth callback success, user:', session.user.email);
-            setStatus('Authentication successful! Redirecting...');
+            setStatus('Saving profile...');
+            
+            // 🔑 Save provider tokens if available
+            // if (providerToken || providerRefreshToken) {
+            //   try {
+            //     console.log('💾 Saving provider tokens to profile...');
+
+            //     console.log('✅ Provider tokens saved successfully');
+            //     setStatus('Profile saved! Redirecting...');
+            //   } catch (profileError) {
+            //     console.error('⚠️ Failed to save provider tokens:', profileError);
+            //     // Don't fail the auth flow, just log the error
+            //     setStatus('Authentication successful! Redirecting...');
+            //   }
+            // } else {
+            //   console.warn('⚠️ No provider tokens found in callback URL');
+            //   setStatus('Authentication successful! Redirecting...');
+            // }
             
             // Clear URL parameters
             if (window.history && window.history.replaceState) {
@@ -83,6 +114,8 @@ export default function AuthCallback() {
         } else {
           // For native platforms
           console.log('📱 Native callback handling');
+          setStatus('Checking native session...');
+          
           const { data: { session }, error } = await supabase.auth.getSession();
           
           if (error) {
@@ -90,9 +123,13 @@ export default function AuthCallback() {
             router.replace('/(auth)/signin');
             return;
           }
-
+  
           if (session) {
             console.log('✅ Native auth success:', session.user.email);
+            setStatus('Native authentication successful! Redirecting...');
+            
+            // For native, provider tokens should already be handled in the sign-in function
+            // But we could add additional logic here if needed
             router.replace('/(tabs)');
           } else {
             console.log('❌ No session in native callback');
@@ -105,9 +142,43 @@ export default function AuthCallback() {
         router.replace('/(auth)/signin?error=callback_failed');
       }
     };
-
+  
     handleCallback();
   }, [router]);
+  
+  // Make sure you have this helper function available (import it or define it)
+  const saveUserProfile = async (user, tokens) => {
+    try {
+      console.log('💾 Attempting to save user profile:', {
+        userId: user.id,
+        email: user.email,
+        hasProviderToken: !!tokens.providerToken,
+        hasProviderRefreshToken: !!tokens.providerRefreshToken
+      });
+  
+      const { error } = await supabase
+        .from('user_profiles') // Replace with your actual table name
+        .upsert({
+          id: user.id,
+          email: user.email,
+          // full_name: user.user_metadata?.full_name || user.user_metadata?.name,
+          // avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture,
+          // provider_token: tokens.providerToken,
+          google_refresh_token: tokens.providerRefreshToken,
+          
+          created_at: new Date().toISOString()
+        });
+  
+      if (error) {
+        throw new Error(`Database error: ${error.message}`);
+      }
+  
+      console.log('✅ User profile saved to database');
+    } catch (err) {
+      console.error('❌ saveUserProfile error:', err);
+      throw new Error(`Failed to save user profile: ${err.message}`);
+    }
+  };
 
   return (
     <View style={styles.container}>

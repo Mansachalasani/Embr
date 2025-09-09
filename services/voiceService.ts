@@ -219,7 +219,7 @@ export class VoiceService {
           linearPCMIsFloat: false,
         },
         web: {
-          mimeType: 'audio/wav',
+          mimeType: 'audio/webm',
           bitsPerSecond: 128000,
         },
       };
