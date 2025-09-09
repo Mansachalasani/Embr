@@ -1,5 +1,6 @@
 import * as sdk from 'microsoft-cognitiveservices-speech-sdk';
 import { Readable } from 'stream';
+import { AudioConverter } from './audioConverter';
 
 export interface SpeechConfig {
   subscriptionKey: string;
@@ -243,6 +244,102 @@ export class AzureSpeechService {
         pushStream.write(arrayBuffer);
       }
     };
+  }
+
+  /**
+   * Speech-to-text with format conversion support
+   * Handles various audio formats (WebM, MP3, WAV, etc.) and converts them for Azure Speech
+   */
+  async speechToTextWithConversion(audioBuffer: Buffer, mimeType: string): Promise<{
+    success: boolean;
+    text?: string;
+    error?: string;
+  }> {
+    try {
+      console.log('🔧 Processing audio with format conversion...');
+      console.log('📊 Audio details:', { size: audioBuffer.length, mimeType });
+      
+      // Convert audio to WAV format if needed
+      console.log('🔄 Converting audio to Azure-compatible format...');
+      const conversionResult = await AudioConverter.convertForAzure(audioBuffer, mimeType);
+      
+      if (!conversionResult.success || !conversionResult.audioBuffer) {
+        console.error('❌ Audio conversion failed:', conversionResult.error);
+        return {
+          success: false,
+          error: `Audio conversion failed: ${conversionResult.error}`
+        };
+      }
+      
+      console.log('✅ Audio converted successfully');
+      console.log('📊 Converted audio size:', conversionResult.audioBuffer.length, 'bytes');
+      
+      // Process the converted WAV audio with Azure Speech Service
+      return this.processWAVAudio(conversionResult.audioBuffer);
+      
+    } catch (error) {
+      console.error('❌ speechToTextWithConversion error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  private async processWAVAudio(audioBuffer: Buffer): Promise<{
+    success: boolean;
+    text?: string;
+    error?: string;
+  }> {
+    return new Promise((resolve) => {
+      try {
+        console.log('🎤 Processing converted WAV audio with Azure Speech Service...');
+        
+        // Configure for WAV format (16kHz, 16-bit, mono PCM)
+        const audioFormat = sdk.AudioStreamFormat.getWaveFormatPCM(16000, 16, 1);
+        const pushStream = sdk.AudioInputStream.createPushStream(audioFormat);
+        
+        // Push the WAV audio data
+        const arrayBuffer = audioBuffer.buffer.slice(audioBuffer.byteOffset, audioBuffer.byteOffset + audioBuffer.byteLength) as ArrayBuffer;
+        pushStream.write(arrayBuffer);
+        pushStream.close();
+        
+        const audioConfig = sdk.AudioConfig.fromStreamInput(pushStream);
+        const recognizer = new sdk.SpeechRecognizer(this.speechConfig, audioConfig);
+        
+        recognizer.recognizeOnceAsync(
+          (result) => {
+            console.log('🎤 WAV Audio result reason:', result.reason);
+            console.log('🎤 WAV Audio result text:', result.text);
+            console.log('🎤 WAV Audio result duration:', result.duration);
+            
+            if (result.reason === sdk.ResultReason.RecognizedSpeech) {
+              console.log('✅ WAV Speech recognized successfully:', result.text);
+              resolve({ success: true, text: result.text });
+            } else if (result.reason === sdk.ResultReason.NoMatch) {
+              console.log('❌ No speech recognized in converted WAV audio');
+              console.log('🔍 NoMatch details:', result);
+              resolve({ success: false, error: 'No speech could be recognized from the audio' });
+            } else {
+              console.log('❌ WAV Speech recognition error:', result.errorDetails);
+              resolve({ success: false, error: result.errorDetails || 'Speech recognition failed' });
+            }
+            recognizer.close();
+          },
+          (error) => {
+            console.error('❌ WAV Speech recognition failed:', error);
+            resolve({ success: false, error: error.toString() });
+            recognizer.close();
+          }
+        );
+      } catch (error) {
+        console.error('❌ processWAVAudio error:', error);
+        resolve({ 
+          success: false, 
+          error: error instanceof Error ? error.message : 'WAV processing error' 
+        });
+      }
+    });
   }
 
   /**

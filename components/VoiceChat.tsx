@@ -1495,7 +1495,7 @@ export function VoiceChat({
       
       // Process the voice message
       const result = await VoiceService.processVoiceMessage(audioUri);
-      
+      console.log(result)
       if (result.success && result.audioData && result.userText && result.aiText) {
         console.log('✅ Voice processing successful');
         

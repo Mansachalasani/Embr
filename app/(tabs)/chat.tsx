@@ -897,13 +897,39 @@ export default function Chat() {
       setIsRecordingVoice(false);
       
       if (audioUri && currentSession?.id) {
+        console.log('🎤 Processing voice message with audioUri:', audioUri);
+        
         // Process the voice message
         const result = await VoiceService.processVoiceMessage(audioUri);
         
+        console.log('📤 Voice processing result:', {
+          success: result.success,
+          hasUserText: !!result.userText,
+          hasAiText: !!result.aiText,
+          hasAudioData: !!result.audioData,
+          error: result.error
+        });
+        
         if (result.success && result.userText && result.aiText) {
+          console.log('✅ Adding voice messages to chat...');
           // Add messages to chat
           await handleVoiceMessage(result.userText, result.aiText, result.audioData || new ArrayBuffer(0));
+          
+          // Play the audio response if available
+          if (result.audioData) {
+            try {
+              console.log('🔊 Playing AI audio response...');
+              await VoiceService.playAudioResponse(result.audioData);
+            } catch (audioError) {
+              console.error('❌ Error playing audio response:', audioError);
+            }
+          }
+        } else {
+          console.error('❌ Voice processing failed or missing data:', result.error);
+          Alert.alert('Voice Processing Error', result.error || 'Failed to process voice message');
         }
+      } else {
+        console.warn('⚠️ No audio URI or session available');
       }
       
       // Hide the popup after recording
