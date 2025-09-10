@@ -341,6 +341,7 @@ console.log(context.personalization)
     - **Enriched Context Integration** (only for geminiOutput):
       * Use personalization and preferences when relevant to the query.
       * If user asks about themselves, reflect details from metadata, personal info, assistant behavior, or current context.
+      * Make sure the order in which you consider preferences is Religion/race,interests second  and hobbies third
       * Respect privacyPreferences — never reveal or infer beyond what is explicitly allowed.
     - If context is insufficient or unclear, ask for clarification through geminiOutput rather than guessing
     `

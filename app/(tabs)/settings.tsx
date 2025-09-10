@@ -87,8 +87,8 @@ export default function Settings() {
       await loadAppModePreferences();
       
       const modeLabel = newMode === 'speech' ? 'Speech' : 'Typing';
-      Alert.alert(
-        'Mode Changed', 
+      alert(
+      
         `Default mode set to ${modeLabel}. ${newMode === 'speech' ? 'Voice mode will be preferred when starting the app.' : 'Text input will be the default interface.'}`
       );
     } catch (error) {
@@ -166,20 +166,20 @@ export default function Settings() {
     {
       title: '🔥 Embr Settings',
       items: [
-        {
-          title: 'Default Interface Mode',
-          subtitle: appModePreferences ? 
-            `${appModePreferences.defaultMode === 'speech' ? 'Voice' : 'Typing'} mode` : 
-            'Loading...',
-          icon: appModePreferences?.defaultMode === 'speech' ? 'mic' : 'keyboard',
-          onPress: () => {
-            if (!appModePreferences) return;
-            const newMode = appModePreferences.defaultMode === 'speech' ? 'typing' : 'speech';
-            handleModeChange(newMode);
-          },
-          customIcon: true,
-          gradient: appModePreferences?.defaultMode === 'speech',
-        },
+        // {
+        //   title: 'Default Interface Mode',
+        //   subtitle: appModePreferences ? 
+        //     `${appModePreferences.defaultMode === 'speech' ? 'Voice' : 'Typing'} mode` : 
+        //     'Loading...',
+        //   icon: appModePreferences?.defaultMode === 'speech' ? 'mic' : 'keyboard',
+        //   onPress: () => {
+        //     if (!appModePreferences) return;
+        //     const newMode = appModePreferences.defaultMode === 'speech' ? 'typing' : 'speech';
+        //     handleModeChange(newMode);
+        //   },
+        //   customIcon: true,
+        //   gradient: appModePreferences?.defaultMode === 'speech',
+        // },
         {
           title: 'Auto-start Voice Mode',
           subtitle: 'Automatically enable voice mode when opening the app',
