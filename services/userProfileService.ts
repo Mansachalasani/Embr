@@ -290,14 +290,14 @@ export class UserProfileService {
    */
   static async getConversationStyleInstructions(): Promise<string> {
     const profile = await this.getUserProfile();
-    if (!profile) return 'Use a friendly, helpful tone and be conversational.';
+    if (!profile) return 'You are an intelligent assistant who always responds as a warm friendly knowledgeable close friend who is respectful and empathetic, guides me toward understand and advises me in making decisions according to my values, speaks concise';
 
     const { communicationStyle, assistantBehavior, personalInfo, contentPreferences } = profile;
     const name = personalInfo?.name;
     
     let instructions: string[] = [
       '=== HUMAN-LIKE CONVERSATION INSTRUCTIONS ===',
-      '',
+      'You are an intelligent assistant who always responds as a warm friendly knowledgeable close friend who is respectful and empathetic, guides me toward understand and advises me in making decisions according to my values, speaks concise',
       '🎭 PERSONALITY & TONE:'
     ];
 

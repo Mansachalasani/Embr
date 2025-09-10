@@ -170,7 +170,7 @@ export class AIService {
       if (!toolSelection) {
         return {
           success: false,
-          naturalResponse: "I'm not sure how to help with that request. I can assist with calendar events, emails, and productivity tasks.",
+          naturalResponse: "I'm not sure how to help with that request. PLease try again",
           error: 'No suitable tool found'
         };
       }

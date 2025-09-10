@@ -222,42 +222,42 @@ export class DeepLinkingService {
     // },
 
     // // Social Media - Instagram
-    {
-      name: 'Open Instagram',
-      description: 'Open Instagram app or search for users/hashtags',
-      keywords: ['instagram', 'insta', 'ig', 'gram'],
-      execute: async (query: string) => {
-        const userMatch = query.match(/(?:instagram|insta|ig)\s+(.+)/i);
-        const searchTerm = userMatch ? userMatch[1].trim() : '';
+    // {
+    //   name: 'Open Instagram',
+    //   description: 'Open Instagram app or search for users/hashtags',
+    //   keywords: ['instagram'],
+    //   execute: async (query: string) => {
+    //     const userMatch = query.match(/(?:instagram|insta|ig)\s+(.+)/i);
+    //     const searchTerm = userMatch ? userMatch[1].trim() : '';
         
-        if (searchTerm) {
-          // Try to open specific user profile or hashtag
-          const isHashtag = searchTerm.startsWith('#');
-          const cleanTerm = searchTerm.replace(/[@#]/g, '');
-          const encodedTerm = encodeURIComponent(cleanTerm);
+    //     if (searchTerm) {
+    //       // Try to open specific user profile or hashtag
+    //       const isHashtag = searchTerm.startsWith('#');
+    //       const cleanTerm = searchTerm.replace(/[@#]/g, '');
+    //       const encodedTerm = encodeURIComponent(cleanTerm);
           
-          const instagramUrl = isHashtag 
-            ? `https://www.instagram.com/explore/tags/${encodedTerm}/`
-            : `https://www.instagram.com/${encodedTerm}/`;
+    //       const instagramUrl = isHashtag 
+    //         ? `https://www.instagram.com/explore/tags/${encodedTerm}/`
+    //         : `https://www.instagram.com/${encodedTerm}/`;
           
-          const canOpen = await Linking.canOpenURL(instagramUrl);
-          if (canOpen) {
-            await Linking.openURL(instagramUrl);
-            return true;
-          }
-        } else {
-          // Just open Instagram
-          try {
-            await Linking.openURL('instagram://');
-            return true;
-          } catch {
-            await Linking.openURL('https://instagram.com');
-            return true;
-          }
-        }
-        return false;
-      }
-    },
+    //       const canOpen = await Linking.canOpenURL(instagramUrl);
+    //       if (canOpen) {
+    //         await Linking.openURL(instagramUrl);
+    //         return true;
+    //       }
+    //     } else {
+    //       // Just open Instagram
+    //       try {
+    //         await Linking.openURL('instagram://');
+    //         return true;
+    //       } catch {
+    //         await Linking.openURL('https://instagram.com');
+    //         return true;
+    //       }
+    //     }
+    //     return false;
+    //   }
+    // },
 
     // // Social Media - Twitter/X
     {

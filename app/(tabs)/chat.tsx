@@ -1095,9 +1095,9 @@ export default function Chat() {
               ]}>
                 {isSystem ? 'System' : isTool ? 'Tool' : 'Assistant'}
               </Text>
-              {item.metadata?.loading && (
+              {/* {item.metadata?.loading && (
                 <ActivityIndicator size="small" color={colors.warning} style={styles.loadingSpinner} />
-              )}
+              )} */}
             </View>
           )}
 
