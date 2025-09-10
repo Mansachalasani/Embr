@@ -44,6 +44,7 @@ export interface UserContext {
   timestamp: string;
   timezone?: string;
   sessionId?: string;
+  styleInstructions?: string;
   preferences?: {
     responseStyle: 'brief' | 'detailed' | 'conversational';
     includeActions: boolean;

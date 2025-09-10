@@ -459,185 +459,185 @@ export class UserProfileService {
       return `Hey${friendlyName}! I don't have any information about your preferences yet. Let's get your profile set up so I can assist you better! You can do this in your profile settings.`;
     }
 
-    // Personal Information Queries  
-    if (lowerQuery.includes('hobby') || lowerQuery.includes('hobbies')) {
-      const hobbies = profile.personalInfo?.hobbies;
-      if (hobbies && hobbies.length > 0) {
-        let response = `${name ? `Hey ${name}! 🎨` : 'Hey there! 🎨'}\n\n`;
-        response += `**Your Hobbies:**\n`;
-        hobbies.forEach((hobby, index) => {
-          response += `${index + 1}. **${hobby}** ✨\n`;
-        });
-        response += `\n${this.getActivityRelatedSuggestion(hobbies, 'hobbies')}`;
-        return response;
-      }
-      return `${name ? `${name}, I` : 'I'} don't see any hobbies in your profile yet! 🤔\n\n**Tell me:** What do you love doing in your free time? I'd be excited to learn more about your interests and help you with them! 🌟`;
-    }
+    // // Personal Information Queries  
+    // if (lowerQuery.includes('hobby') || lowerQuery.includes('hobbies')) {
+    //   const hobbies = profile.personalInfo?.hobbies;
+    //   if (hobbies && hobbies.length > 0) {
+    //     let response = `${name ? `Hey ${name}! 🎨` : 'Hey there! 🎨'}\n\n`;
+    //     response += `**Your Hobbies:**\n`;
+    //     hobbies.forEach((hobby, index) => {
+    //       response += `${index + 1}. **${hobby}** ✨\n`;
+    //     });
+    //     response += `\n${this.getActivityRelatedSuggestion(hobbies, 'hobbies')}`;
+    //     return response;
+    //   }
+    //   return `${name ? `${name}, I` : 'I'} don't see any hobbies in your profile yet! 🤔\n\n**Tell me:** What do you love doing in your free time? I'd be excited to learn more about your interests and help you with them! 🌟`;
+    // }
 
-    if (lowerQuery.includes('profession') || lowerQuery.includes('job') || lowerQuery.includes('work') || lowerQuery.includes('career')) {
-      const profession = profile.personalInfo?.profession;
-      const industry = profile.personalInfo?.industry;
-      const experience = profile.personalInfo?.experience_level;
+    // if (lowerQuery.includes('profession') || lowerQuery.includes('job') || lowerQuery.includes('work') || lowerQuery.includes('career')) {
+    //   const profession = profile.personalInfo?.profession;
+    //   const industry = profile.personalInfo?.industry;
+    //   const experience = profile.personalInfo?.experience_level;
       
-      if (profession) {
-        let response = `${name ? `${name}! 💼` : 'Hey! 💼'}\n\n`;
-        response += `**Your Career:**\n`;
-        response += `• **Role:** ${profession}\n`;
-        if (industry) response += `• **Industry:** ${industry}\n`;
-        if (experience) response += `• **Experience Level:** ${experience}\n`;
-        response += `\n${this.getWorkRelatedSuggestion(profession, industry)}`;
-        return response;
-      }
-      return `${name ? `${name}, I'd` : 'I\'d'} love to know more about your career! 🚀\n\n**Tell me:** What do you do for work? Whether you're just starting out or you're a seasoned pro, I'm here to help with anything work-related! 💪`;
-    }
+    //   if (profession) {
+    //     let response = `${name ? `${name}! 💼` : 'Hey! 💼'}\n\n`;
+    //     response += `**Your Career:**\n`;
+    //     response += `• **Role:** ${profession}\n`;
+    //     if (industry) response += `• **Industry:** ${industry}\n`;
+    //     if (experience) response += `• **Experience Level:** ${experience}\n`;
+    //     response += `\n${this.getWorkRelatedSuggestion(profession, industry)}`;
+    //     return response;
+    //   }
+    //   return `${name ? `${name}, I'd` : 'I\'d'} love to know more about your career! 🚀\n\n**Tell me:** What do you do for work? Whether you're just starting out or you're a seasoned pro, I'm here to help with anything work-related! 💪`;
+    // }
 
-    if (lowerQuery.includes('name') || lowerQuery.includes('who am i') || lowerQuery.includes('my name')) {
-      if (name) {
-        return `Hi there! 👋\n\n**Your Name:** ${name}\n\nIt's so nice to know what to call you! I love having that personal connection. Makes our conversations feel much more friendly, don't you think? 😊`;
-      }
-      return `Hey! 👋\n\n**Your Name:** *Not set yet*\n\nI'd absolutely love to know what to call you! Having your name makes our chats feel so much more personal and friendly. 😊\n\n**Want to tell me?** Just let me know your name and I'll remember it for all our future conversations! ✨`;
-    }
+    // if (lowerQuery.includes('name') || lowerQuery.includes('who am i') || lowerQuery.includes('my name')) {
+    //   if (name) {
+    //     return `Hi there! 👋\n\n**Your Name:** ${name}\n\nIt's so nice to know what to call you! I love having that personal connection. Makes our conversations feel much more friendly, don't you think? 😊`;
+    //   }
+    //   return `Hey! 👋\n\n**Your Name:** *Not set yet*\n\nI'd absolutely love to know what to call you! Having your name makes our chats feel so much more personal and friendly. 😊\n\n**Want to tell me?** Just let me know your name and I'll remember it for all our future conversations! ✨`;
+    // }
 
-    // Interests and Learning
-    if (lowerQuery.includes('interest') || lowerQuery.includes('like') || lowerQuery.includes('enjoy')) {
-      const interests = profile.contentPreferences?.primary_interests;
-      const currentAffairs = profile.contentPreferences?.current_affairs_interests;
-      const learningStyle = profile.contentPreferences?.learning_style;
+    // // Interests and Learning
+    // if (lowerQuery.includes('interest') || lowerQuery.includes('like') || lowerQuery.includes('enjoy')) {
+    //   const interests = profile.contentPreferences?.primary_interests;
+    //   const currentAffairs = profile.contentPreferences?.current_affairs_interests;
+    //   const learningStyle = profile.contentPreferences?.learning_style;
       
-      if (interests && interests.length > 0) {
-        let response = `${name ? `${name}! 🎯` : 'Hey! 🎯'}\n\n`;
-        response += `**Your Main Interests:**\n`;
-        interests.forEach((interest, index) => {
-          response += `${index + 1}. **${interest}** 💫\n`;
-        });
+    //   if (interests && interests.length > 0) {
+    //     let response = `${name ? `${name}! 🎯` : 'Hey! 🎯'}\n\n`;
+    //     response += `**Your Main Interests:**\n`;
+    //     interests.forEach((interest, index) => {
+    //       response += `${index + 1}. **${interest}** 💫\n`;
+    //     });
         
-        if (currentAffairs && currentAffairs.length > 0) {
-          response += `\n**You Also Follow:**\n`;
-          currentAffairs.forEach((topic, index) => {
-            response += `• ${topic}\n`;
-          });
-        }
+    //     if (currentAffairs && currentAffairs.length > 0) {
+    //       response += `\n**You Also Follow:**\n`;
+    //       currentAffairs.forEach((topic, index) => {
+    //         response += `• ${topic}\n`;
+    //       });
+    //     }
         
-        if (learningStyle) {
-          response += `\n**Learning Style:** ${learningStyle} learner 📚\n\n*I'll keep this in mind when explaining things to you!*`;
-        }
+    //     if (learningStyle) {
+    //       response += `\n**Learning Style:** ${learningStyle} learner 📚\n\n*I'll keep this in mind when explaining things to you!*`;
+    //     }
         
-        response += `\n\n${this.getInterestRelatedSuggestion(interests)}`;
-        return response;
-      } else {
-        return `${name ? `${name}, I'm` : 'I\'m'} curious about what fascinates you! 🤔✨\n\n**Tell me:** What topics, subjects, or areas really capture your interest? Whether it's technology, arts, science, sports, or anything else - I'd love to learn about what makes you excited! 🌟\n\n*The more I know about your interests, the better I can tailor my help just for you!*`;
-      }
-    }
+    //     response += `\n\n${this.getInterestRelatedSuggestion(interests)}`;
+    //     return response;
+    //   } else {
+    //     return `${name ? `${name}, I'm` : 'I\'m'} curious about what fascinates you! 🤔✨\n\n**Tell me:** What topics, subjects, or areas really capture your interest? Whether it's technology, arts, science, sports, or anything else - I'd love to learn about what makes you excited! 🌟\n\n*The more I know about your interests, the better I can tailor my help just for you!*`;
+    //   }
+    // }
 
-    // Communication and Personality Preferences
-    if (lowerQuery.includes('communication') || lowerQuery.includes('tone') || lowerQuery.includes('personality') || lowerQuery.includes('style')) {
-      const style = profile.communicationStyle;
-      const behavior = profile.assistantBehavior;
+    // // Communication and Personality Preferences
+    // if (lowerQuery.includes('communication') || lowerQuery.includes('tone') || lowerQuery.includes('personality') || lowerQuery.includes('style')) {
+    //   const style = profile.communicationStyle;
+    //   const behavior = profile.assistantBehavior;
       
-      if (style) {
-        let response = `${name ? `Perfect question, ${name}! 💬` : 'Great question! 💬'}\n\n`;
-        response += `**How You Like Me to Communicate:**\n\n`;
-        response += `• **Tone:** ${style.tone} 🎭\n`;
-        response += `• **Detail Level:** ${style.detail_level} explanations 📊\n`;
-        response += `• **Response Length:** ${style.response_length} responses 📝\n`;
+    //   if (style) {
+    //     let response = `${name ? `Perfect question, ${name}! 💬` : 'Great question! 💬'}\n\n`;
+    //     response += `**How You Like Me to Communicate:**\n\n`;
+    //     response += `• **Tone:** ${style.tone} 🎭\n`;
+    //     response += `• **Detail Level:** ${style.detail_level} explanations 📊\n`;
+    //     response += `• **Response Length:** ${style.response_length} responses 📝\n`;
         
-        if (style.use_analogies) response += `• **Analogies:** Yes, you love them! 📚\n`;
-        if (style.include_examples) response += `• **Examples:** Always include practical ones 💡\n`;
+    //     if (style.use_analogies) response += `• **Analogies:** Yes, you love them! 📚\n`;
+    //     if (style.include_examples) response += `• **Examples:** Always include practical ones 💡\n`;
         
-        if (behavior?.personality) {
-          response += `• **My Personality:** ${behavior.personality} 🤖\n`;
-        }
+    //     if (behavior?.personality) {
+    //       response += `• **My Personality:** ${behavior.personality} 🤖\n`;
+    //     }
         
-        response += `\n*This helps me tailor every single response just for you! I love having these guidelines to make our conversations perfect.* ✨`;
-        return response;
-      }
-      return `${name ? `${name}, I'd` : 'I\'d'} love to know your communication preferences! 💭\n\n**Tell me:** How do you like me to talk with you?\n\n• Should I be casual and friendly? 😊\n• More professional and structured? 💼\n• Enthusiastic and energetic? 🎉\n• Something else entirely?\n\n*The more you tell me, the better I can match your style!*`;
-    }
+    //     response += `\n*This helps me tailor every single response just for you! I love having these guidelines to make our conversations perfect.* ✨`;
+    //     return response;
+    //   }
+    //   return `${name ? `${name}, I'd` : 'I\'d'} love to know your communication preferences! 💭\n\n**Tell me:** How do you like me to talk with you?\n\n• Should I be casual and friendly? 😊\n• More professional and structured? 💼\n• Enthusiastic and energetic? 🎉\n• Something else entirely?\n\n*The more you tell me, the better I can match your style!*`;
+    // }
 
-    // Work Preferences and Productivity
-    if (lowerQuery.includes('productivity') || lowerQuery.includes('schedule') || lowerQuery.includes('meeting') || lowerQuery.includes('work style')) {
-      const workPrefs = profile.workPreferences;
-      if (workPrefs) {
-        let response = `${name ? `${name}, here's` : 'Here\'s'} what I know about your work style: `;
-        const details = [];
+    // // Work Preferences and Productivity
+    // if (lowerQuery.includes('productivity') || lowerQuery.includes('schedule') || lowerQuery.includes('meeting') || lowerQuery.includes('work style')) {
+    //   const workPrefs = profile.workPreferences;
+    //   if (workPrefs) {
+    //     let response = `${name ? `${name}, here's` : 'Here\'s'} what I know about your work style: `;
+    //     const details = [];
         
-        if (workPrefs.work_schedule) details.push(`you're most productive in the ${workPrefs.work_schedule}`);
-        if (workPrefs.productivity_style) details.push(`you prefer ${workPrefs.productivity_style.replace('_', ' ')}`);
-        if (workPrefs.meeting_preferences) details.push(`you like ${workPrefs.meeting_preferences} meetings`);
-        if (workPrefs.priority_framework) details.push(`you use ${workPrefs.priority_framework.replace('_', ' ')} for prioritizing`);
+    //     if (workPrefs.work_schedule) details.push(`you're most productive in the ${workPrefs.work_schedule}`);
+    //     if (workPrefs.productivity_style) details.push(`you prefer ${workPrefs.productivity_style.replace('_', ' ')}`);
+    //     if (workPrefs.meeting_preferences) details.push(`you like ${workPrefs.meeting_preferences} meetings`);
+    //     if (workPrefs.priority_framework) details.push(`you use ${workPrefs.priority_framework.replace('_', ' ')} for prioritizing`);
         
-        if (details.length > 0) {
-          response += details.join(', ') + '. I can help optimize your workflow based on these preferences!';
-          return response;
-        }
-      }
-      return `Tell me about your work style${friendlyName}! Are you a morning person? Do you prefer focused work blocks or frequent breaks?`;
-    }
+    //     if (details.length > 0) {
+    //       response += details.join(', ') + '. I can help optimize your workflow based on these preferences!';
+    //       return response;
+    //     }
+    //   }
+    //   return `Tell me about your work style${friendlyName}! Are you a morning person? Do you prefer focused work blocks or frequent breaks?`;
+    // }
 
-    // Technology and Domain Preferences
-    if (lowerQuery.includes('tech') || lowerQuery.includes('programming') || lowerQuery.includes('coding') || lowerQuery.includes('technology')) {
-      const domainPrefs = profile.domainPreferences;
-      if (domainPrefs?.tech_stack && domainPrefs.tech_stack.length > 0) {
-        return `${name ? `${name}, you` : 'You'} work with: ${domainPrefs.tech_stack.join(', ')}. ${domainPrefs.coding_style ? `You prefer ${domainPrefs.coding_style} code` : ''} ${domainPrefs.documentation_preference ? `and like ${domainPrefs.documentation_preference.replace('_', ' ')} documentation` : ''}. I can help you with any of these technologies!`;
-      }
-      return `What technologies do you work with${friendlyName}? I'd love to help with your tech stack!`;
-    }
+    // // Technology and Domain Preferences
+    // if (lowerQuery.includes('tech') || lowerQuery.includes('programming') || lowerQuery.includes('coding') || lowerQuery.includes('technology')) {
+    //   const domainPrefs = profile.domainPreferences;
+    //   if (domainPrefs?.tech_stack && domainPrefs.tech_stack.length > 0) {
+    //     return `${name ? `${name}, you` : 'You'} work with: ${domainPrefs.tech_stack.join(', ')}. ${domainPrefs.coding_style ? `You prefer ${domainPrefs.coding_style} code` : ''} ${domainPrefs.documentation_preference ? `and like ${domainPrefs.documentation_preference.replace('_', ' ')} documentation` : ''}. I can help you with any of these technologies!`;
+    //   }
+    //   return `What technologies do you work with${friendlyName}? I'd love to help with your tech stack!`;
+    // }
 
-    // Privacy and Settings
-    if (lowerQuery.includes('privacy') || lowerQuery.includes('data') || lowerQuery.includes('settings')) {
-      const privacy = profile.privacyPreferences;
-      if (privacy) {
-        let response = `${name ? `${name}, here's` : 'Here\'s'} your privacy setup: `;
-        response += `personalization level is ${privacy.personalization_level || 'moderate'}`;
-        if (privacy.data_retention_days) response += `, data kept for ${privacy.data_retention_days} days`;
-        if (privacy.cross_session_memory !== undefined) response += `, ${privacy.cross_session_memory ? 'I remember' : 'I don\'t remember'} our past conversations`;
-        response += `. Your privacy matters to me!`;
-        return response;
-      }
-      return `Let's talk about your privacy preferences${friendlyName}. How would you like me to handle your data?`;
-    }
+    // // Privacy and Settings
+    // if (lowerQuery.includes('privacy') || lowerQuery.includes('data') || lowerQuery.includes('settings')) {
+    //   const privacy = profile.privacyPreferences;
+    //   if (privacy) {
+    //     let response = `${name ? `${name}, here's` : 'Here\'s'} your privacy setup: `;
+    //     response += `personalization level is ${privacy.personalization_level || 'moderate'}`;
+    //     if (privacy.data_retention_days) response += `, data kept for ${privacy.data_retention_days} days`;
+    //     if (privacy.cross_session_memory !== undefined) response += `, ${privacy.cross_session_memory ? 'I remember' : 'I don\'t remember'} our past conversations`;
+    //     response += `. Your privacy matters to me!`;
+    //     return response;
+    //   }
+    //   return `Let's talk about your privacy preferences${friendlyName}. How would you like me to handle your data?`;
+    // }
 
-    // Accessibility
-    if (lowerQuery.includes('accessibility') || lowerQuery.includes('voice') || lowerQuery.includes('text size') || lowerQuery.includes('display')) {
-      const accessibility = profile.accessibilityNeeds;
-      if (accessibility) {
-        let response = `${name ? `${name}, I'm` : 'I\'m'} set up for your accessibility needs: `;
-        const needs = [];
-        if (accessibility.voice_response_speed) needs.push(`voice at ${accessibility.voice_response_speed} speed`);
-        if (accessibility.text_size_preference) needs.push(`${accessibility.text_size_preference} text`);
-        if (accessibility.high_contrast) needs.push('high contrast mode');
-        if (accessibility.screen_reader_optimized) needs.push('screen reader optimization');
+    // // Accessibility
+    // if (lowerQuery.includes('accessibility') || lowerQuery.includes('voice') || lowerQuery.includes('text size') || lowerQuery.includes('display')) {
+    //   const accessibility = profile.accessibilityNeeds;
+    //   if (accessibility) {
+    //     let response = `${name ? `${name}, I'm` : 'I\'m'} set up for your accessibility needs: `;
+    //     const needs = [];
+    //     if (accessibility.voice_response_speed) needs.push(`voice at ${accessibility.voice_response_speed} speed`);
+    //     if (accessibility.text_size_preference) needs.push(`${accessibility.text_size_preference} text`);
+    //     if (accessibility.high_contrast) needs.push('high contrast mode');
+    //     if (accessibility.screen_reader_optimized) needs.push('screen reader optimization');
         
-        if (needs.length > 0) {
-          response += needs.join(', ') + '. I want to make sure you have the best experience!';
-          return response;
-        }
-      }
-      return `I want to make sure I'm accessible for you${friendlyName}! Any specific needs I should know about?`;
-    }
+    //     if (needs.length > 0) {
+    //       response += needs.join(', ') + '. I want to make sure you have the best experience!';
+    //       return response;
+    //     }
+    //   }
+    //   return `I want to make sure I'm accessible for you${friendlyName}! Any specific needs I should know about?`;
+    // }
 
     // General preference query
-    if (lowerQuery.includes('preference') || lowerQuery.includes('setting') || lowerQuery.includes('profile') || lowerQuery.includes('about me')) {
-      return this.getComprehensivePreferenceSummary(profile);
-    }
+    // if (lowerQuery.includes('preference') || lowerQuery.includes('setting') || lowerQuery.includes('profile') || lowerQuery.includes('about me')) {
+    //   return this.getComprehensivePreferenceSummary(profile);
+    // }
 
-    // Religion/Personal beliefs (handle sensitively)
-    if (lowerQuery.includes('religion') || lowerQuery.includes('belief') || lowerQuery.includes('faith')) {
-      const religion = profile.personalInfo?.religion;
-      if (religion && religion !== 'prefer_not_to_say') {
-        return `I respect that you identify as ${religion}${friendlyName}. I'll keep this in mind in our conversations.`;
-      }
-      return `I respect your personal beliefs${friendlyName}, and I'll always be mindful of that in our conversations.`;
-    }
+    // // Religion/Personal beliefs (handle sensitively)
+    // if (lowerQuery.includes('religion') || lowerQuery.includes('belief') || lowerQuery.includes('faith')) {
+    //   const religion = profile.personalInfo?.religion;
+    //   if (religion && religion !== 'prefer_not_to_say') {
+    //     return `I respect that you identify as ${religion}${friendlyName}. I'll keep this in mind in our conversations.`;
+    //   }
+    //   return `I respect your personal beliefs${friendlyName}, and I'll always be mindful of that in our conversations.`;
+    // }
 
     // Time and Location
-    if (lowerQuery.includes('timezone') || lowerQuery.includes('time zone') || lowerQuery.includes('location')) {
-      const timezone = profile.personalInfo?.time_zone;
-      if (timezone) {
-        return `${name ? `${name}, you're` : 'You\'re'} in the ${timezone} timezone. I'll keep this in mind when suggesting times for things!`;
-      }
-      return `What timezone are you in${friendlyName}? It helps me give you better time-based suggestions!`;
-    }
+    // if (lowerQuery.includes('timezone') || lowerQuery.includes('time zone') || lowerQuery.includes('location')) {
+    //   const timezone = profile.personalInfo?.time_zone;
+    //   if (timezone) {
+    //     return `${name ? `${name}, you're` : 'You\'re'} in the ${timezone} timezone. I'll keep this in mind when suggesting times for things!`;
+    //   }
+    //   return `What timezone are you in${friendlyName}? It helps me give you better time-based suggestions!`;
+    // }
 
     return null; // Query not recognized as preference-related
   }

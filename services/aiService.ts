@@ -65,29 +65,29 @@ export class AIService {
       }
 
       // STEP 2: Check if this is a preference-related query first (with full context)
-      const preferenceResponse = await UserProfileService.handlePreferenceQuery(request.query);
-      if (preferenceResponse) {
-        // Even preference queries get the user's name from context if available
-        let enhancedResponse = preferenceResponse;
-        if (completeContext) {
-          const displayName = await UserContextService.getUserDisplayName();
-          if (displayName !== 'friend' && !enhancedResponse.includes(displayName)) {
-            // Add personalized touch if not already present
-            enhancedResponse = enhancedResponse.replace(/^(Hey[^!]*!)/, `Hey ${displayName}!`);
-          }
-        }
+      // const preferenceResponse = await UserProfileService.handlePreferenceQuery(request.query);
+      // if (preferenceResponse) {
+      //   // Even preference queries get the user's name from context if available
+      //   let enhancedResponse = preferenceResponse;
+      //   if (completeContext) {
+      //     const displayName = await UserContextService.getUserDisplayName();
+      //     if (displayName !== 'friend' && !enhancedResponse.includes(displayName)) {
+      //       // Add personalized touch if not already present
+      //       enhancedResponse = enhancedResponse.replace(/^(Hey[^!]*!)/, `Hey ${displayName}!`);
+      //     }
+      //   }
 
-        return {
-          success: true,
-          data: {
-            query: request.query,
-            response: enhancedResponse,
-            toolUsed: 'userProfile',
-            reasoning: 'Retrieved information from user preferences with complete context'
-          },
-          timestamp: new Date().toISOString()
-        };
-      }
+      //   return {
+      //     success: true,
+      //     data: {
+      //       query: request.query,
+      //       response: enhancedResponse,
+      //       toolUsed: 'userProfile',
+      //       reasoning: 'Retrieved information from user preferences with complete context'
+      //     },
+      //     timestamp: new Date().toISOString()
+      //   };
+      // }
 
       // STEP 3: Prepare session and authentication
       const { data: { session } } = await supabase.auth.getSession();

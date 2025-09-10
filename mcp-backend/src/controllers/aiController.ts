@@ -36,7 +36,7 @@ export class AIController {
         return;
       }
 
-      const { query, sessionId, preferences } = req.body;
+      const { query, sessionId, preferences, completeUserContext } = req.body;
 
       if (!query || typeof query !== 'string') {
         res.status(400).json({
@@ -58,7 +58,9 @@ export class AIController {
           responseStyle: preferences?.responseStyle || 'conversational',
           includeActions: preferences?.includeActions !== false,
           ...preferences
-        }
+        },
+        styleInstructions: preferences?.styleInstructions || '',
+        completeUserContext:completeUserContext || undefined
       };
 
       const result = await AIController.aiService.processQuery(context, req.user.id);

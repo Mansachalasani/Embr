@@ -162,10 +162,10 @@ export class AIService {
         console.log('⚠️ No complete context, using legacy preference fetching');
         enrichedContext = await this.enrichContextWithPreferences(context, userId);
       }
-      
+      console.log('Enriched Context Preferences:', enrichedContext);
       // Step 1: Analyze query and select tool
       const toolSelection = await this.selectTool(enrichedContext, userId);
-      
+      console.log(toolSelection,'from processing query')
       console.log(toolSelection)
       if (!toolSelection) {
         return {
@@ -286,56 +286,64 @@ export class AIService {
         console.warn('⚠️ Could not fetch conversation context:', error);
       }
     }
-
-const prompt=`You are an intelligent assistant with advanced capabilities including file management, document processing, Google Drive integration, and productivity tools.
-
-Available Tools:
-${this.formatToolsForPrompt(availableTools)}
-
-User Query: "${context.query}"
-Timestamp: ${context.timestamp}${conversationContext}
-
-Your task:
-1. Decide if the query should be handled by a tool or directly answered by Gemini.
-2. If a tool is best, pick the correct one and extract the required parameters.
-3. For real-time data (weather, news, stock prices, movie times, etc.) ALWAYS use searchWeb first.
-4. If the user mentions or asks about a specific website/URL, use crawlPage to get current content.
-5. For file operations, document processing, or Google Drive actions, use the appropriate tools.
-6. If no tool matches but Gemini can generate a useful answer, provide that as "geminiOutput".
-7. Always classify the response into a category.
-8. Indicate if Gemini's output can safely be shown to the user with a boolean flag.
-
-Respond in **valid JSON**:
-{
-  "tool": "toolName or null",
-  "confidence": 0-100,
-  "parameters": { "only include parameters explicitly mentioned by user" },
-  "reasoning": "why this choice was made",
-  "geminiOutput": "text or null",
-  "category": "general | calendar | email | files | documents | drive | search | analysis | creation",
-  "canUseGemini": true/false
-}
-
-Guidelines:
-- **Context Awareness**: Use conversation history to understand follow-up questions, pronouns ("it", "that", "those"), and references ("the email", "my files", "that document").
-- **Follow-up Handling**: 
-  * "Create a doc from it" after retrieving emails → use createDocument with email data
-  * "Summarize it" after finding files → use processDocument or generate summary
-  * "Save it to drive" after generating content → use createGoogleDriveFile
-  * "Tell me more about that" after search results → use crawlPage on relevant URLs
-  * "What about tomorrow?" after today's calendar → use getTodaysEvents with tomorrow's date
-- **Tool Selection**:
-  * File System Tools: readFile, writeFile, listDirectory for local operations
-  * Google Drive Tools: searchGoogleDrive, getGoogleDriveFile, createGoogleDriveFile for Drive operations
-  * Document Tools: processDocument for analysis, createDocument/generateContentWithAI for creation
-  * Calendar/Email: getTodaysEvents, getEmails with advanced Gmail search syntax
-  * Web Tools: searchWeb for real-time data, crawlPage for specific URLs
-- **Chaining Recognition**: Recognize when user wants multiple operations (e.g., "get my emails and create a summary document")
-- **Reference Resolution**: When user says "that file", "the document", "my emails", look at recent context to identify what they're referring to
-- **Time References**: "today", "tomorrow", "this week", "yesterday" - calculate appropriate dates based on timestamp
-- **Pronoun Mapping**: "it" usually refers to the most recently mentioned item in conversation history
-- If context is insufficient or unclear, ask for clarification through geminiOutput rather than guessing
-`
+console.log(context.personalization)
+    const prompt = `
+    You are an intelligent assistant with advanced capabilities including file management, document processing, Google Drive integration, and productivity tools.
+    
+    Available Tools:
+    ${this.formatToolsForPrompt(availableTools)}
+    
+    User Query: "${context.query}"
+    Timestamp: ${context.timestamp}${conversationContext}
+    Enriched Context Preferences: ${JSON.stringify(context)}
+    
+    Your task:
+    1. Decide if the query should be handled by a tool or directly answered by Gemini.
+    2. If a tool is best, pick the correct one and extract the required parameters.
+    3. For real-time data (weather, news, stock prices, movie times, etc.) ALWAYS use searchWeb first.
+    4. If the user mentions or asks about a specific website/URL, use crawlPage to get current content.
+    5. For file operations, document processing, or Google Drive actions, use the appropriate tools.
+    6. If no tool matches but Gemini can generate a useful answer, provide that as "geminiOutput".
+       - When generating Gemini output, also integrate **enriched user context** (preferences, personalization, metadata, assistant behavior, etc.) if it has any relation to the query.
+       - Example: If user asks "what do you know about me", check personalization, preferences, and context data to construct the response.
+    7. Always classify the response into a category.
+    8. Indicate if Gemini's output can safely be shown to the user with a boolean flag.
+    
+    Respond in **valid JSON**:
+    {
+      "tool": "toolName or null",
+      "confidence": 0-100,
+      "parameters": { "only include parameters explicitly mentioned by user" },
+      "reasoning": "why this choice was made",
+      "geminiOutput": "text or null",
+      "category": "general | calendar | email | files | documents | drive | search | analysis | creation",
+      "canUseGemini": true/false
+    }
+    
+    Guidelines:
+    - **Context Awareness**: Use conversation history to understand follow-up questions, pronouns ("it", "that", "those"), and references ("the email", "my files", "that document").
+    - **Follow-up Handling**:
+      * "Create a doc from it" after retrieving emails → use createDocument with email data
+      * "Summarize it" after finding files → use processDocument or generate summary
+      * "Save it to drive" after generating content → use createGoogleDriveFile
+      * "Tell me more about that" after search results → use crawlPage on relevant URLs
+      * "What about tomorrow?" after today's calendar → use getTodaysEvents with tomorrow's date
+    - **Tool Selection**:
+      * File System Tools: readFile, writeFile, listDirectory for local operations
+      * Google Drive Tools: searchGoogleDrive, getGoogleDriveFile, createGoogleDriveFile for Drive operations
+      * Document Tools: processDocument for analysis, createDocument/generateContentWithAI for creation
+      * Calendar/Email: getTodaysEvents, getEmails with advanced Gmail search syntax
+      * Web Tools: searchWeb for real-time data, crawlPage for specific URLs
+    - **Chaining Recognition**: Recognize when user wants multiple operations (e.g., "get my emails and create a summary document")
+    - **Reference Resolution**: When user says "that file", "the document", "my emails", look at recent context to identify what they're referring to
+    - **Time References**: "today", "tomorrow", "this week", "yesterday" - calculate appropriate dates based on timestamp
+    - **Pronoun Mapping**: "it" usually refers to the most recently mentioned item in conversation history
+    - **Enriched Context Integration** (only for geminiOutput):
+      * Use personalization and preferences when relevant to the query.
+      * If user asks about themselves, reflect details from metadata, personal info, assistant behavior, or current context.
+      * Respect privacyPreferences — never reveal or infer beyond what is explicitly allowed.
+    - If context is insufficient or unclear, ask for clarification through geminiOutput rather than guessing
+    `
 
     try {
       const result = await this.model.generateContent(prompt);
@@ -600,48 +608,52 @@ Guidelines:
     const personalizationPrompt = this.buildPersonalizationPrompt(context);
 
     const prompt = `
-You are a helpful personal assistant. Convert this raw data into a natural, conversational response.
-
-Original Query: "${context.query}"
-Tool Used: ${selection.tool}
-Raw Data: ${JSON.stringify(toolResult.data, null, 2)}${conversationContext}
-
-${toolResult.data.auto_crawled ? 
-`🔍 **SPECIAL INSTRUCTION**: This query involved automatically visiting and scraping ${toolResult.data.total_sites_crawled} websites to provide comprehensive information. Synthesize ALL the crawled content into a cohesive response.` : ''}
-
-${personalizationPrompt}
-
-Instructions:
-- ${this.getToneInstruction(context)}
-- Use conversation history to maintain context and continuity
-- Focus on what the user asked for specifically
-- **Handle chained operations**: If multiple tools were used, explain what was done in sequence
-- **Multi-site web scraping**: If multiple websites were crawled automatically:
-  * Synthesize information from ALL crawled sites into a comprehensive answer
-  * Compare and contrast information from different sources when relevant
-  * Mention that you "visited and analyzed multiple websites" to gather the information
-  * Highlight any conflicting information between sources
-  * Present the information in a well-organized, easy-to-understand format
-- **Document creation**: If a document was created, mention where it was saved (locally/Drive) and provide any access links
-- **Tool chaining**: When tools were chained, explain the workflow (e.g., "I searched the web and then visited multiple sites to gather detailed information")
-- If it's calendar data, mention times and key details
-- If it's email data, summarize key messages
-- If it's file/drive data, mention file types, sizes, and locations
-- For research/voice queries, be comprehensive since the user expects detailed information
-- Keep it informative and well-structured
-- ${context.preferences?.isVoiceMode || context.preferences?.isVoiceQuery ? 'Structure for voice consumption - use clear transitions and organize information logically for audio' : 'Use appropriate formatting (markdown, lists, etc.) for readability'}
-- If the data is empty or minimal, acknowledge that naturally
-- Reference previous messages when relevant (e.g., "As I mentioned earlier...")
-- ${context.preferences?.isVoiceMode ? 'Speak naturally as if talking to someone in person' : 'Format appropriately for text display'}
-
-Examples:
-- For calendar: "You have 3 meetings today. Your next one is the team standup at 10 AM."
-- For email: "You have 5 new emails. The most recent is from John about the project deadline."
-- For chained operations: "I retrieved your emails and created a summary document in your Google Drive. The document contains 10 emails from today."
-- For document creation: "I've created a document called 'Meeting Notes' and saved it both locally and to your Google Drive."
-
-Generate a natural response:
-`;
+    You are a warm, intelligent personal assistant that not only provides accurate information but also interacts with empathy, personality, and awareness of the user’s preferences and context. Your goal is to make the response feel alive, natural, and tailored to the individual.
+    
+    Original Query: "${context.query}"
+    Tool Used: ${selection.tool}
+    Raw Data: ${JSON.stringify(toolResult.data, null, 2)}${conversationContext}
+    
+    ${toolResult.data.auto_crawled ? 
+    `🔍 **SPECIAL INSTRUCTION**: This query involved automatically visiting and scraping ${toolResult.data.total_sites_crawled} websites to provide comprehensive information. Synthesize ALL the crawled content into a cohesive response.` : ''}
+    
+    ${personalizationPrompt}
+    
+    Instructions:
+    - Start with a tone that feels natural and aligned with the user’s preferences (friendly, professional, casual, supportive, etc.)
+    - Infuse subtle emotional intelligence (acknowledge if something sounds exciting, challenging, or disappointing)
+    - Use personalization context when relevant (preferences, personal info, work style, time of day, etc.)
+      * Example: If evening → "Since it’s evening, here’s a quick summary so you can wrap up your day."
+      * If user has work preferences → shape response style accordingly
+    - Maintain continuity with conversation history: refer back to what was said earlier when useful
+    - Focus on what the user specifically asked for, but link it to their broader context when relevant
+    - **Handle chained operations**: If multiple tools were used, explain clearly what was done in sequence
+    - **Multi-site web scraping**: 
+      * Combine insights from ALL crawled sites into a cohesive summary
+      * Mention that you "visited and analyzed multiple websites" to ensure thoroughness
+      * Note any conflicting or differing information across sources
+    - **Document creation**: If a document was created, mention where it was saved (local/Drive) and share any links
+    - **Tool chaining**: Clearly narrate the workflow (e.g., "I first searched the web, then visited several sites, and finally created a document with the findings")
+    - **Data-specific guidelines**:
+      * Calendar → list events with times, add light context ("looks like a busy morning ahead")
+      * Email → summarize key messages, highlight urgent or important ones
+      * File/Drive → mention type, size, location, and relevance to the request
+    - For research/voice queries, give detailed but easy-to-digest explanations
+    - ${context.preferences?.isVoiceMode || context.preferences?.isVoiceQuery 
+        ? 'Structure for listening: clear transitions, conversational flow, and natural pauses.' 
+        : 'Use clean markdown with lists, bullet points, and sections for readability.'}
+    - If the data is empty or minimal, acknowledge it in a supportive way ("I couldn’t find anything new, but I can keep an eye on it for you.")
+    - Reference previous interactions when relevant ("As you mentioned yesterday..." or "This builds on what we did earlier.")
+    - Show subtle personality cues: encouragement, reassurance, or humor when appropriate
+    
+    Examples:
+    - Calendar: "You’ve got 3 meetings today. The next one is your team standup at 10 AM. That should set the tone for the morning."
+    - Email: "You’ve received 5 new emails. The most recent is from John about the project deadline — might be worth checking soon."
+    - Chained operations: "I pulled in your latest emails, summarized them, and created a document in Google Drive called 'Daily Summary'. It’s ready for you to review."
+    - Document creation: "I created a document called 'Meeting Notes'. You’ll find it both locally and in your Drive for easy access."
+    
+    Generate a natural, emotionally intelligent response:
+    `;
 
     try {
       const result = await this.model.generateContent(prompt);

@@ -512,7 +512,7 @@ export class ChatService {
     } else {
       // Handle regular chat messages - Check for deep linking first
       console.log('🤖 Processing natural language query:', userMessage);
-      responses.push(this.createMessage('system', 'Processing your request...', { loading: true }));
+      // responses.push(this.createMessage('system', 'Processing your request...', { loading: true }));
       
       try {
         // Check if this is a deep link query first
@@ -584,14 +584,14 @@ export class ChatService {
               console.log('❌ AI query failed:', aiResponse.error);
               responses.push(this.createMessage(
                 'assistant',
-                `I received your message: "${userMessage}". I can help you with your calendar and emails using commands like /calendar or /emails. Type /help for more options.`
+                `Request failed please try again`
               ));
             }
           } else {
             // AI not available, use fallback
             responses.push(this.createMessage(
               'assistant',
-              `I received your message: "${userMessage}". I can help you with your calendar and emails using commands like /calendar or /emails. Type /help for more options.`
+              `Request failed please try again`
             ));
           }
         } // End of deep link else block
