@@ -1210,12 +1210,16 @@ import * as FileSystem from 'expo-file-system';
 interface VoiceChatProps {
   sessionId?: string;
   onVoiceMessage?: (userText: string, aiText: string, audioData: ArrayBuffer) => void;
+  onRecordingStateChange?: (isRecording: boolean) => void;
+  autoRecording?: boolean;
   disabled?: boolean;
 }
 
 export function VoiceChat({ 
   sessionId, 
   onVoiceMessage, 
+  onRecordingStateChange,
+  autoRecording,
   disabled = false
 }: VoiceChatProps) {
   const { colors } = useTheme();
@@ -1297,19 +1301,48 @@ export function VoiceChat({
     initializeVoiceService();
   }, []);
 
-  // Recording animation
+  useEffect(() => {
+    console.log('hi i pressed')
+   if (autoRecording && hasPermission  ) {
+    console.log('hi im inside')
+      handleVoiceButtonPress();
+    }
+  }, [hasPermission])
+  
+  // Fire-like recording animation
   useEffect(() => {
     if (isRecording) {
+      // Create a fire-like flickering effect with multiple overlapping animations
       Animated.loop(
         Animated.sequence([
           Animated.timing(recordingAnimation, {
             toValue: 1,
-            duration: 500,
+            duration: 150,
             useNativeDriver: false,
           }),
           Animated.timing(recordingAnimation, {
-            toValue: 0,
-            duration: 500,
+            toValue: 0.3,
+            duration: 100,
+            useNativeDriver: false,
+          }),
+          Animated.timing(recordingAnimation, {
+            toValue: 0.9,
+            duration: 80,
+            useNativeDriver: false,
+          }),
+          Animated.timing(recordingAnimation, {
+            toValue: 0.1,
+            duration: 120,
+            useNativeDriver: false,
+          }),
+          Animated.timing(recordingAnimation, {
+            toValue: 0.8,
+            duration: 90,
+            useNativeDriver: false,
+          }),
+          Animated.timing(recordingAnimation, {
+            toValue: 0.2,
+            duration: 110,
             useNativeDriver: false,
           }),
         ])
@@ -1452,7 +1485,8 @@ export function VoiceChat({
       // Stop playback if user taps while playing
       await VoiceService.stopAudioPlayback();
       setIsPlaying(false);
-      setIsRecording(true)
+      setIsRecording(true);
+      onRecordingStateChange?.(true);
       return;
     }
 
@@ -1469,6 +1503,7 @@ export function VoiceChat({
 
       await voiceService.current.startRecording();
       setIsRecording(true);
+      onRecordingStateChange?.(true);
       console.log('🎤 Started recording...');
     } catch (error) {
       console.error('❌ Error starting recording:', error);
@@ -1494,6 +1529,7 @@ export function VoiceChat({
   const stopRecording = async () => {
     try {
       setIsRecording(false);
+      onRecordingStateChange?.(false);
       setIsProcessing(true);
       console.log('⏹️ Stopping recording and processing...');
 
@@ -1629,20 +1665,60 @@ export function VoiceChat({
             />
           )}
           
-          {/* Recording indicator */}
+          {/* Fire-like recording indicators */}
           {isRecording && (
-            <Animated.View
-              style={{
-                position: 'absolute',
-                top: 4,
-                right: 4,
-                width: 8,
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: 'white',
-                opacity: recordingAnimation,
-              }}
-            />
+            <>
+              {/* Main fire indicator */}
+              <Animated.View
+                style={{
+                  position: 'absolute',
+                  top: 3,
+                  right: 3,
+                  width: 10,
+                  height: 10,
+                  borderRadius: 5,
+                  backgroundColor: '#FF4500', // Orange-red fire color
+                  opacity: recordingAnimation,
+                  shadowColor: '#FF4500',
+                  shadowOffset: { width: 0, height: 0 },
+                  shadowOpacity: 0.8,
+                  shadowRadius: 4,
+                  elevation: 4,
+                }}
+              />
+              {/* Secondary fire indicator */}
+              <Animated.View
+                style={{
+                  position: 'absolute',
+                  top: 5,
+                  right: 5,
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: '#FFD700', // Golden fire color
+                  opacity: recordingAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.2, 0.9],
+                  }),
+                }}
+              />
+              {/* Outer glow effect */}
+              <Animated.View
+                style={{
+                  position: 'absolute',
+                  top: 1,
+                  right: 1,
+                  width: 14,
+                  height: 14,
+                  borderRadius: 7,
+                  backgroundColor: 'rgba(255, 69, 0, 0.3)',
+                  opacity: recordingAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 0.6],
+                  }),
+                }}
+              />
+            </>
           )}
         </TouchableOpacity>
       </Animated.View>

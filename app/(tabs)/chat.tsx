@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Modal,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -358,7 +359,7 @@ export default function Chat() {
     voiceModalSubtitle: {
       fontSize: 16,
       color: colors.textSecondary,
-      marginBottom: 32,
+      marginBottom: 2,
       textAlign: 'center',
     },
     holdToTalkButton: {
@@ -404,6 +405,43 @@ export default function Chat() {
       color: colors.textSecondary,
       fontWeight: '600',
     },
+    
+    // Fire wave animation styles
+    voiceButtonContainer: {
+      position: 'relative',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 24,
+    },
+    fireWave: {
+      position: 'absolute',
+      borderRadius: 100,
+      borderWidth: 2,
+    },
+    fireWave1: {
+      width: 120,
+      height: 120,
+      borderColor: 'rgba(255, 69, 0, 0.3)', // Orange-red
+      backgroundColor: 'rgba(255, 69, 0, 0.05)',
+    },
+    fireWave2: {
+      width: 100,
+      height: 100,
+      borderColor: 'rgba(255, 140, 0, 0.4)', // Dark orange
+      backgroundColor: 'rgba(255, 140, 0, 0.08)',
+    },
+    fireWave3: {
+      width: 80,
+      height: 80,
+      borderColor: 'rgba(255, 165, 0, 0.5)', // Orange
+      backgroundColor: 'rgba(255, 165, 0, 0.1)',
+    },
+    fireWave4: {
+      width: 70,
+      height: 70,
+      borderColor: 'rgba(255, 215, 0, 0.6)', // Gold
+      backgroundColor: 'rgba(255, 215, 0, 0.12)',
+    },
   });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -425,7 +463,28 @@ export default function Chat() {
   const [showVoicePopup, setShowVoicePopup] = useState(false);
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const [autoRecord, setautoRecord] = useState(false)
   const messageCache = useRef<Map<string, ChatMessage[]>>(new Map());
+
+  // Fire wave animations
+  const fireWave1 = useRef(new Animated.Value(0)).current;
+  const fireWave2 = useRef(new Animated.Value(0)).current;
+  const fireWave3 = useRef(new Animated.Value(0)).current;
+  const fireWave4 = useRef(new Animated.Value(0)).current;
+ 
+useEffect(() => {
+  const getStartupType= async () => {
+    const typeOrAudio= await AsyncStorage.getItem('app_mode_preferences');
+    const data= JSON.parse(typeOrAudio || '{}');
+    setShowVoicePopup(data.autoStartSpeech===true)
+    setIsRecordingVoice(data.autoStartSpeech===true)
+   setIsRecordingVoice(data.autoStartSpeech===true)
+   setautoRecord(data.autoStartSpeech===true)
+   
+
+  }
+  getStartupType()
+}, [])
 
   // Initialize session on component mount
   useEffect(() => {
@@ -436,6 +495,83 @@ export default function Chat() {
   useEffect(() => {
     initializeAppMode();
   }, []);
+
+  // Fire wave animations - start when recording
+  useEffect(() => {
+    if (isRecordingVoice) {
+      // Create staggered fire wave animations
+      const animations = [
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(fireWave1, {
+              toValue: 1,
+              duration: 1200,
+              useNativeDriver: true,
+            }),
+            Animated.timing(fireWave1, {
+              toValue: 0,
+              duration: 1200,
+              useNativeDriver: true,
+            }),
+          ])
+        ),
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(fireWave2, {
+              toValue: 1,
+              duration: 1500,
+              useNativeDriver: true,
+            }),
+            Animated.timing(fireWave2, {
+              toValue: 0,
+              duration: 1500,
+              useNativeDriver: true,
+            }),
+          ])
+        ),
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(fireWave3, {
+              toValue: 1,
+              duration: 1800,
+              useNativeDriver: true,
+            }),
+            Animated.timing(fireWave3, {
+              toValue: 0,
+              duration: 1800,
+              useNativeDriver: true,
+            }),
+          ])
+        ),
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(fireWave4, {
+              toValue: 1,
+              duration: 2100,
+              useNativeDriver: true,
+            }),
+            Animated.timing(fireWave4, {
+              toValue: 0,
+              duration: 2100,
+              useNativeDriver: true,
+            }),
+          ])
+        ),
+      ];
+
+      // Start all animations with slight delays for staggered effect
+      animations[0].start();
+      setTimeout(() => animations[1].start(), 300);
+      setTimeout(() => animations[2].start(), 600);
+      setTimeout(() => animations[3].start(), 900);
+    } else {
+      // Reset all fire waves when not recording
+      fireWave1.setValue(0);
+      fireWave2.setValue(0);
+      fireWave3.setValue(0);
+      fireWave4.setValue(0);
+    }
+  }, [isRecordingVoice]);
 
   const initializeAppMode = async () => {
     try {
@@ -1217,29 +1353,12 @@ export default function Chat() {
               />
             ) : (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>👋 How can I help you today?</Text>
+                <Text style={styles.emptyText}>🔥 How can I help you today?</Text>
               </View>
             )
           }
 
-          {/* Streaming Message */}
-          {streamingMessage && (
-            <StreamingMessage
-              content={streamingMessage.content}
-              isStreaming={streamingMessage.isStreaming}
-              toolName={streamingMessage.toolName}
-              toolStatus={streamingMessage.toolStatus}
-              onStreamComplete={() => {
-                // Auto-scroll when streaming completes
-                setTimeout(() => {
-                  flatListRef.current?.scrollToEnd({ animated: true });
-                }, 100);
-              }}
-            />
-          )}
-
-          {/* Thinking Animation */}
-          <ThinkingAnimation visible={isLoading && !!thinkingMessage} message={thinkingMessage} />
+          {/* Note: Removed streaming message and thinking animation for cleaner voice experience */}
 
 
 
@@ -1331,15 +1450,96 @@ export default function Chat() {
                 {isRecordingVoice ? 'Release to send' : 'Hold to record'}
               </Text>
               
-              {/* Big Push-to-Talk Button */}
-              <VoiceChat
-            sessionId={currentSession?.id}
-            onVoiceMessage={handleVoiceMessage}
-            onVoiceModeChange={handleVoiceModeChange}
-            disabled={isLoading}
-            currentAppMode={currentAppMode}
-            autoStartContinuous={currentAppMode === 'speech' && isVoiceModeEnabled}
-          />
+              {/* Big Push-to-Talk Button with Fire Wave Effects */}
+              <View style={styles.voiceButtonContainer}>
+                {/* Fire Wave Effects */}
+                {isRecordingVoice && (
+                  <>
+                    {/* Outer fire wave */}
+                    <Animated.View style={[
+                      styles.fireWave,
+                      styles.fireWave1,
+                      {
+                        opacity: fireWave1.interpolate({
+                          inputRange: [0, 0.5, 1],
+                          outputRange: [0.1, 0.6, 0.1],
+                        }),
+                        transform: [{
+                          scale: fireWave1.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [1, 2.8],
+                          }),
+                        }],
+                      }
+                    ]} />
+                    
+                    {/* Second fire wave */}
+                    <Animated.View style={[
+                      styles.fireWave,
+                      styles.fireWave2,
+                      {
+                        opacity: fireWave2.interpolate({
+                          inputRange: [0, 0.5, 1],
+                          outputRange: [0.15, 0.7, 0.15],
+                        }),
+                        transform: [{
+                          scale: fireWave2.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [1, 2.4],
+                          }),
+                        }],
+                      }
+                    ]} />
+                    
+                    {/* Third fire wave */}
+                    <Animated.View style={[
+                      styles.fireWave,
+                      styles.fireWave3,
+                      {
+                        opacity: fireWave3.interpolate({
+                          inputRange: [0, 0.5, 1],
+                          outputRange: [0.2, 0.8, 0.2],
+                        }),
+                        transform: [{
+                          scale: fireWave3.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [1, 2.0],
+                          }),
+                        }],
+                      }
+                    ]} />
+                    
+                    {/* Inner fire wave */}
+                    <Animated.View style={[
+                      styles.fireWave,
+                      styles.fireWave4,
+                      {
+                        opacity: fireWave4.interpolate({
+                          inputRange: [0, 0.5, 1],
+                          outputRange: [0.3, 0.9, 0.3],
+                        }),
+                        transform: [{
+                          scale: fireWave4.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [1, 1.6],
+                          }),
+                        }],
+                      }
+                    ]} />
+                  </>
+                )}
+              <View style={{marginTop:50}}>
+
+                <VoiceChat
+                  sessionId={currentSession?.id}
+                  onVoiceMessage={handleVoiceMessage}
+                  onRecordingStateChange={setIsRecordingVoice}
+                  disabled={isLoading}
+                  autoRecording={autoRecord}
+                 
+                />
+              </View>
+              </View>
               
               <TouchableOpacity
                 style={styles.voiceModalCancelButton}
