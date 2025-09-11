@@ -64,35 +64,6 @@ export const onboardingSteps: OnboardingStep[] = [
       },
     ],
   },
-  {
-    id: 'ai_model',
-    title: 'AI Model Preference',
-    description: 'Choose your preferred AI model for conversations.',
-    questions: [
-      {
-        id: 'preferred_model',
-        category: 'assistantBehavior',
-        question: 'Which AI model would you prefer?',
-        subtitle: 'You can change this anytime in settings',
-        type: 'single_select',
-        required: true,
-        options: [
-          { 
-            value: 'gemini', 
-            label: 'Google Gemini', 
-            description: 'Google\'s latest AI model - fast and efficient',
-            icon: '🟢' 
-          },
-          { 
-            value: 'gpt-4', 
-            label: 'OpenAI GPT-4', 
-            description: 'OpenAI\'s powerful language model',
-            icon: '🤖' 
-          },
-        ],
-      },
-    ],
-  },
 ];
 
 // Helper function to get all questions in a flat array
@@ -141,7 +112,6 @@ export const getDefaultPreferences = () => ({
     personality: 'helpful' as const,
     error_handling: 'problem_solving' as const,
     uncertainty_handling: 'provide_alternatives' as const,
-    preferred_model: 'gemini' as const,
   },
   domainPreferences: {},
   privacyPreferences: {},

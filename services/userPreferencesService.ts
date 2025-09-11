@@ -154,6 +154,53 @@ export class UserPreferencesService {
   }
 
   /**
+   * Update complete user preferences (for settings)
+   */
+  static async updateUserPreferences(
+    preferences: UserPersonalizationData
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+  }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No active session');
+      }
+
+      const response = await fetch(`${MCP_BASE_URL}/user/preferences`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          preferences,
+          onboarding_completed: true, // Assume completed if updating from settings
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return {
+        success: true,
+        message: data.message,
+      };
+    } catch (error) {
+      console.error('❌ Error updating user preferences:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update user preferences',
+      };
+    }
+  }
+
+  /**
    * Complete onboarding
    */
   static async completeOnboarding(): Promise<{

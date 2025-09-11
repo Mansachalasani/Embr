@@ -9,7 +9,7 @@ export interface AIToolParameter {
 export interface AIToolMetadata {
   name: string;
   description: string;
-  category: 'calendar' | 'email' | 'productivity' | 'system' | 'web' | 'external' | 'social' | 'custom' | 'search' | 'files' | 'drive' | 'documents';
+  category: 'calendar' | 'email' | 'productivity' | 'system' | 'web' | 'external' | 'social' | 'custom' | 'search' | 'files' | 'drive' | 'documents' | 'profile';
   parameters: AIToolParameter[];
   examples: {
     query: string;

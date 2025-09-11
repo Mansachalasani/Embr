@@ -15,6 +15,8 @@ export class AIService {
   private toolRegistry: MCPToolRegistry;
   private responseCache: Map<string, any> = new Map();
   private cacheTimeout = 5 * 60 * 1000; // 5 minutes
+  private static promptCache: Map<string, {result: string, timestamp: number}> = new Map();
+  private static contextCache: Map<string, {data: any, timestamp: number}> = new Map();
 
   constructor(modelType: AIModelType = 'gemini') {
     this.modelType = modelType;
@@ -42,25 +44,64 @@ export class AIService {
    */
   private async generateContent(prompt: string): Promise<string> {
     try {
+      // Check prompt cache for identical prompts
+      const promptHash = this.hashPrompt(prompt);
+      const cached = AIService.promptCache.get(promptHash);
+      if (cached && Date.now() - cached.timestamp < 2 * 60 * 1000) { // 2 min cache for prompts
+        return cached.result;
+      }
+
+      let result: string;
+      
       if (this.modelType === 'gemini' && this.model) {
-        const result = await this.model.generateContent(prompt);
-        const response = await result.response;
-        return response.text().trim();
+        const response = await Promise.race([
+          this.model.generateContent(prompt),
+          this.timeout(15000) // 15 second timeout
+        ]);
+        result = (await response.response).text().trim();
       } else if (this.modelType === 'gpt-4' && this.openai) {
-        const completion = await this.openai.chat.completions.create({
-          model: 'gpt-4o',
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.7,
-          max_tokens: 4000,
-        });
-        return completion.choices[0]?.message?.content?.trim() || '';
+        const completion = await Promise.race([
+          this.openai.chat.completions.create({
+            model: 'gpt-4o-mini', // Use mini for faster responses
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.5, // Lower temperature for faster, more consistent responses
+            max_tokens: 3000, // Reduced for faster generation
+          }),
+          this.timeout(12000) // 12 second timeout
+        ]);
+        result = completion.choices[0]?.message?.content?.trim() || '';
       } else {
         throw new Error(`Invalid model configuration: ${this.modelType}`);
       }
+
+      // Cache the result
+      AIService.promptCache.set(promptHash, {
+        result,
+        timestamp: Date.now()
+      });
+
+      return result;
     } catch (error) {
       console.error(`❌ Error generating content with ${this.modelType}:`, error);
       throw error;
     }
+  }
+
+  private hashPrompt(prompt: string): string {
+    // Simple hash function for caching
+    let hash = 0;
+    for (let i = 0; i < prompt.length; i++) {
+      const char = prompt.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return hash.toString();
+  }
+
+  private timeout(ms: number): Promise<never> {
+    return new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Request timeout')), ms)
+    );
   }
 
   /**
@@ -97,15 +138,6 @@ export class AIService {
       }
     };
 
-    console.log('✅ Context enriched with complete user data:', {
-      googleName: completeContext.googleAccount?.name,
-      googleEmail: completeContext.googleAccount?.email,
-      profileName: completeContext.profile?.personalInfo?.name,
-      hasProfile: !!completeContext.profile,
-      communicationTone: completeContext.profile?.communicationStyle?.tone,
-      hobbiesCount: completeContext.profile?.personalInfo?.hobbies?.length || 0,
-      onboardingCompleted: completeContext.profile?.metadata?.onboarding_completed
-    });
 
     return enhancedContext;
   }
@@ -125,17 +157,10 @@ export class AIService {
         .single();
 
       if (error || !data?.preferences) {
-        console.log('📋 No user preferences found, using defaults');
         return context; // Return original context if no preferences found
       }
 
       const preferences = data.preferences;
-      console.log('🎨 Enriching context with user preferences:', {
-        tone: preferences.communicationStyle?.tone,
-        detailLevel: preferences.communicationStyle?.detail_level,
-        interests: preferences.contentPreferences?.primary_interests?.length || 0,
-        onboardingCompleted: data.onboarding_completed
-      });
 
       // Create enriched context with preferences
       const enrichedContext: UserContext = {
@@ -187,27 +212,19 @@ export class AIService {
    */
   async processQuery(context: UserContext, userId: string): Promise<AIResponse> {
     try {
-      console.log('🧠 AI Processing query with complete user context:', context.query);
       
       // Step 0: Enhanced context enrichment with complete user data
       let enrichedContext = context;
       
       // Check if we have complete user context from client
       if (context.completeUserContext) {
-        console.log('✅ Using complete user context from client');
-        console.log('Google Account:', context.completeUserContext.googleAccount?.name, context.completeUserContext.googleAccount?.email);
-        console.log('Profile data:', !!context.completeUserContext.profile);
         enrichedContext = this.enrichContextWithCompleteUserData(context);
       } else {
         // Fallback to legacy preference fetching
-        console.log('⚠️ No complete context, using legacy preference fetching');
         enrichedContext = await this.enrichContextWithPreferences(context, userId);
       }
-      console.log('Enriched Context Preferences:', enrichedContext);
       // Step 1: Analyze query and select tool
       const toolSelection = await this.selectTool(enrichedContext, userId);
-      console.log(toolSelection,'from processing query')
-      console.log(toolSelection)
       if (!toolSelection) {
         return {
           success: false,
@@ -225,7 +242,6 @@ export class AIService {
           suggestedActions: []
         };
       }
-      console.log('🎯 Selected tool:', toolSelection.tool, 'with confidence:', toolSelection.confidence);
       
       // Step 2: Execute the selected tool (handle null tools for conversational responses)
       let toolResult;
@@ -327,7 +343,6 @@ export class AIService {
         console.warn('⚠️ Could not fetch conversation context:', error);
       }
     }
-console.log(context.personalization)
     const prompt = `
     You are an intelligent assistant with advanced capabilities including file management, document processing, Google Drive integration, and productivity tools.
     
@@ -396,10 +411,8 @@ console.log(context.personalization)
       }
     
       
-      console.log('🤖 AI tool selection response:', text);
       
       const selection = JSON.parse(text);
-      console.log(selection)
       
       // // Validate selection
       // if (selection.tool && !availableTools.find(t => t.name === selection.tool)) {
@@ -431,11 +444,9 @@ console.log(context.personalization)
     // Check cache for non-real-time tools
     const cachedData = this.responseCache.get(cacheKey);
     if (cachedData && Date.now() - cachedData.timestamp < this.cacheTimeout) {
-      console.log('📋 Using cached result for tool:', selection.tool);
       return cachedData.result;
     }
 
-    console.log('🔧 Executing tool:', selection.tool, 'with params:', selection.parameters);
     
     const result = await tool.execute(userId, selection.parameters);
     
@@ -458,9 +469,25 @@ console.log(context.personalization)
    */
   private cleanCache(): void {
     const now = Date.now();
+    
+    // Clean response cache
     for (const [key, value] of this.responseCache.entries()) {
       if (now - value.timestamp > this.cacheTimeout) {
         this.responseCache.delete(key);
+      }
+    }
+    
+    // Clean prompt cache
+    for (const [key, value] of AIService.promptCache.entries()) {
+      if (now - value.timestamp > 2 * 60 * 1000) {
+        AIService.promptCache.delete(key);
+      }
+    }
+    
+    // Clean context cache
+    for (const [key, value] of AIService.contextCache.entries()) {
+      if (now - value.timestamp > 10 * 60 * 1000) { // 10 min for context
+        AIService.contextCache.delete(key);
       }
     }
   }
@@ -801,13 +828,11 @@ console.log(context.personalization)
     context: UserContext
   ): Promise<any> {
     try {
-      console.log('🔗 Performing tool chaining after:', firstSelection.tool);
       
       const query = context.query.toLowerCase();
       
       // 1. Enhanced SearchWeb -> Multi-CrawlPage chaining
       if (firstSelection.tool === 'searchWeb' && firstResult.data.results) {
-        console.log('🔗 Chaining to crawlPage for multiple URLs');
         
         const crawlTool = this.toolRegistry.getTool('crawlPage');
         if (crawlTool) {
@@ -825,14 +850,12 @@ console.log(context.personalization)
             Math.min(results.length, 5) :  // Crawl up to 5 sites for comprehensive queries
             Math.min(results.length, 3);   // Crawl up to 3 sites for regular queries
           
-          console.log(`🕷️ Auto-crawling ${maxSitesToCrawl} sites for comprehensive data`);
           
           // Crawl multiple sites concurrently for speed
           const crawlPromises = results.slice(0, maxSitesToCrawl).map(async (result: any, index: number) => {
             if (!result.url) return null;
             
             try {
-              console.log(`🔗 Crawling site ${index + 1}: ${result.title}`);
               const crawlResult = await crawlTool.execute(userId, {
                 url: result.url,
                 extract_content: true,
@@ -862,7 +885,6 @@ console.log(context.personalization)
             }
           });
 
-          console.log(`✅ Successfully crawled ${crawledContent.length} out of ${maxSitesToCrawl} sites`);
 
           if (crawledContent.length > 0) {
             return {
@@ -883,7 +905,6 @@ console.log(context.personalization)
       // 2. Data Retrieval -> Document Creation chaining
       const dataRetrievalTools = ['getEmails', 'getLastTenMails', 'getTodaysEvents', 'searchGoogleDrive', 'getGoogleDriveFile'];
       if (dataRetrievalTools.includes(firstSelection.tool || '') && firstResult.data) {
-        console.log('🔗 Chaining to createDocument after data retrieval');
         
         // Generate content based on the retrieved data
         let content = '';
@@ -952,7 +973,6 @@ console.log(context.personalization)
       
       // 3. Generated Content -> Save Document chaining  
       if (firstSelection.tool === 'generateContentWithAI' && firstResult.data) {
-        console.log('🔗 Chaining to createDocument after content generation');
         
         const createDocTool = this.toolRegistry.getTool('createDocument');
         if (createDocTool) {
@@ -981,7 +1001,6 @@ console.log(context.personalization)
       
       // 4. Document Processing -> Summary Document chaining
       if (firstSelection.tool === 'processDocument' && firstResult.data) {
-        console.log('🔗 Chaining to createDocument after document processing');
         
         const createDocTool = this.toolRegistry.getTool('createDocument');
         if (createDocTool && firstResult.data.summary) {

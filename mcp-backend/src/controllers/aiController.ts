@@ -9,9 +9,14 @@ export class AIController {
   /**
    * Helper function to get user's preferred AI model and create appropriate AIService instance
    */
-  private static async createAIServiceForUser(userId: string): Promise<AIService> {
+  private static async createAIServiceForUser(userId: string, providedModel?: AIModelType): Promise<AIService> {
     try {
-      // Get user preferences from Supabase
+      // If model is provided in request, use it directly
+      if (providedModel) {
+        return new AIService(providedModel);
+      }
+
+      // Otherwise, get user preferences from Supabase
       const { data: preferencesData, error } = await supabase
         .from('user_preferences')
         .select('preferences')
@@ -19,16 +24,12 @@ export class AIController {
         .single();
 
       if (error || !preferencesData?.preferences?.assistantBehavior?.preferred_model) {
-        // Default to gemini if no preference is set
-        console.log(`🤖 Using default model (Gemini) for user ${userId}`);
         return new AIService('gemini');
       }
 
       const preferredModel = preferencesData.preferences.assistantBehavior.preferred_model as AIModelType;
-      console.log(`🤖 Using preferred model (${preferredModel}) for user ${userId}`);
       return new AIService(preferredModel);
     } catch (error) {
-      console.error('❌ Error fetching user preferences, defaulting to Gemini:', error);
       return new AIService('gemini');
     }
   }
@@ -54,7 +55,7 @@ export class AIController {
         return;
       }
 
-      const { query, sessionId, preferences, completeUserContext } = req.body;
+      const { query, sessionId, preferences, completeUserContext, model } = req.body;
 
       if (!query || typeof query !== 'string') {
         res.status(400).json({
@@ -77,12 +78,11 @@ export class AIController {
           includeActions: preferences?.includeActions !== false,
           ...preferences
         },
-        styleInstructions: preferences?.styleInstructions || '',
         completeUserContext: completeUserContext || undefined
       };
 
-      // Create AI service instance with user's preferred model
-      const aiService = await AIController.createAIServiceForUser(req.user.id);
+      // Create AI service instance with provided model or user's preferred model
+      const aiService = await AIController.createAIServiceForUser(req.user.id, model as AIModelType);
       const result = await aiService.processQuery(context, req.user.id);
 
       res.json({

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,11 +17,25 @@ export default function Settings() {
   const [userPreferences, setUserPreferences] = useState<UserPersonalizationData | null>(null);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
   const [appModePreferences, setAppModePreferences] = useState<AppModePreferences | null>(null);
+  const [selectedModel, setSelectedModel] = useState<'gemini' | 'gpt-4'>('gemini');
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
 
   useEffect(() => {
     loadUserPreferences();
     loadAppModePreferences();
+    loadModelPreference();
   }, []);
+
+  const loadModelPreference = async () => {
+    try {
+      const result = await UserPreferencesService.getUserPreferences();
+      if (result.success && result.preferences?.assistantBehavior?.preferred_model) {
+        setSelectedModel(result.preferences.assistantBehavior.preferred_model);
+      }
+    } catch (error) {
+      console.error('Error loading model preference:', error);
+    }
+  };
 
   const loadUserPreferences = async () => {
     try {
@@ -107,6 +121,32 @@ export default function Settings() {
     }
   };
 
+  const handleModelChange = async (newModel: 'gemini' | 'gpt-4') => {
+    try {
+      const result = await UserPreferencesService.getUserPreferences();
+      if (result.success) {
+        const updatedPreferences = {
+          ...result.preferences,
+          assistantBehavior: {
+            ...result.preferences.assistantBehavior,
+            preferred_model: newModel
+          }
+        };
+        
+        const updateResult = await UserPreferencesService.updateUserPreferences(updatedPreferences);
+        if (updateResult.success) {
+          setSelectedModel(newModel);
+          setShowModelDropdown(false);
+        } else {
+          Alert.alert('Error', updateResult.error || 'Failed to update model preference');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error changing model:', error);
+      Alert.alert('Error', 'Failed to change AI model');
+    }
+  };
+
   const settingsItems = [
     {
       title: '🎯 Personalization',
@@ -166,20 +206,13 @@ export default function Settings() {
     {
       title: '🔥 Embr Settings',
       items: [
-        // {
-        //   title: 'Default Interface Mode',
-        //   subtitle: appModePreferences ? 
-        //     `${appModePreferences.defaultMode === 'speech' ? 'Voice' : 'Typing'} mode` : 
-        //     'Loading...',
-        //   icon: appModePreferences?.defaultMode === 'speech' ? 'mic' : 'keyboard',
-        //   onPress: () => {
-        //     if (!appModePreferences) return;
-        //     const newMode = appModePreferences.defaultMode === 'speech' ? 'typing' : 'speech';
-        //     handleModeChange(newMode);
-        //   },
-        //   customIcon: true,
-        //   gradient: appModePreferences?.defaultMode === 'speech',
-        // },
+        {
+          title: 'AI Model',
+          subtitle: selectedModel === 'gpt-4' ? 'GPT-4 (OpenAI)' : 'Gemini (Google)',
+          icon: 'brain',
+          onPress: () => setShowModelDropdown(true),
+          gradient: selectedModel === 'gpt-4',
+        },
         {
           title: 'Auto-start Voice Mode',
           subtitle: 'Automatically enable voice mode when opening the app',
@@ -343,6 +376,68 @@ export default function Settings() {
     toggle: {
       transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }],
     },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalContent: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 20,
+      width: '80%',
+      maxWidth: 300,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 16,
+      textAlign: 'center',
+    },
+    modelOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      marginBottom: 8,
+      backgroundColor: colors.background,
+      borderWidth: 2,
+      borderColor: 'transparent',
+    },
+    selectedModelOption: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primaryLight + '20',
+    },
+    modelOptionText: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: colors.text,
+    },
+    modelOptionSubtext: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    closeButton: {
+      marginTop: 16,
+      padding: 12,
+      borderRadius: 12,
+      backgroundColor: colors.border,
+      alignItems: 'center',
+    },
+    closeButtonText: {
+      color: colors.text,
+      fontWeight: '500',
+    },
   });
 
   const renderSettingItem = (item: any, itemIndex: number) => {
@@ -503,6 +598,63 @@ export default function Settings() {
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      {/* AI Model Selection Modal */}
+      <Modal
+        visible={showModelDropdown}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowModelDropdown(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowModelDropdown(false)}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select AI Model</Text>
+            
+            <TouchableOpacity
+              style={[
+                styles.modelOption,
+                selectedModel === 'gemini' && styles.selectedModelOption
+              ]}
+              onPress={() => handleModelChange('gemini')}
+            >
+              <View>
+                <Text style={styles.modelOptionText}>🤖 Gemini</Text>
+                <Text style={styles.modelOptionSubtext}>Google's AI model</Text>
+              </View>
+              {selectedModel === 'gemini' && (
+                <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.modelOption,
+                selectedModel === 'gpt-4' && styles.selectedModelOption
+              ]}
+              onPress={() => handleModelChange('gpt-4')}
+            >
+              <View>
+                <Text style={styles.modelOptionText}>🧠 GPT-4</Text>
+                <Text style={styles.modelOptionSubtext}>OpenAI's advanced model</Text>
+              </View>
+              {selectedModel === 'gpt-4' && (
+                <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowModelDropdown(false)}
+            >
+              <Text style={styles.closeButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </LinearGradient>
   );
 }
