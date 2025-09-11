@@ -9,6 +9,7 @@ import {
   MessageCreateRequest,
   SessionWithStats
 } from '../types/session';
+import { TitleGenerator } from '../utils/titleGenerator';
 
 export class SessionService {
   
@@ -16,7 +17,8 @@ export class SessionService {
    * Create a new conversation session
    */
   static async createSession(userId: string, request: SessionCreateRequest): Promise<Session> {
-    const title = request.title || 'New Conversation';
+    // Generate a smart title: use provided title, or generate a creative one
+    const title = request.title || TitleGenerator.generateRandomTitle();
     
     const { data, error } = await supabase
       .from('sessions')
@@ -34,7 +36,7 @@ export class SessionService {
       throw new Error(`Failed to create session: ${error.message}`);
     }
 
-    console.log('✅ Created new session:', data.id);
+    console.log('✅ Created new session:', data.id, 'with title:', title);
     return data;
   }
 
@@ -300,8 +302,9 @@ export class SessionService {
    * Auto-generate session title from first message
    */
   static async updateSessionTitle(sessionId: string, userId: string, firstMessage: string): Promise<void> {
-    const title = this.generateTitleFromMessage(firstMessage);
+    const title = TitleGenerator.generateSmartTitle(firstMessage);
     
+    console.log('🏷️ Updating session title to:', title);
     await this.updateSession(sessionId, userId, { title });
   }
 
@@ -345,22 +348,6 @@ export class SessionService {
     return text.substring(0, maxLength - 3) + '...';
   }
 
-  private static generateTitleFromMessage(message: string): string {
-    // Clean the message and create a meaningful title
-    const cleaned = message.trim();
-    if (cleaned.length <= 50) return cleaned;
-    
-    // Try to find a natural break point
-    const words = cleaned.split(' ');
-    let title = '';
-    
-    for (const word of words) {
-      if ((title + ' ' + word).length > 47) break;
-      title += (title ? ' ' : '') + word;
-    }
-    
-    return title + '...';
-  }
 
   private static generateContextSummary(messages: Message[]): string {
     if (messages.length === 0) return 'Empty conversation';

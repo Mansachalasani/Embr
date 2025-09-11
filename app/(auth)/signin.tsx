@@ -92,6 +92,7 @@ export default function SignIn() {
       justifyContent: 'center',
       alignItems: 'center',
       paddingHorizontal: 32,
+      marginTop:30
     },
     header: {
       alignItems: 'center',
@@ -135,7 +136,7 @@ export default function SignIn() {
       lineHeight: 24,
     },
     featuresContainer: {
-      marginVertical: 40,
+      marginVertical: 5,
       width: '100%',
     },
     feature: {

@@ -250,6 +250,15 @@ export class SessionController {
       
       const message = await SessionService.addMessage(messageRequest);
 
+      // If this is the first user message, update session title based on message content
+      if (role === 'user') {
+        const messages = await SessionService.getSessionMessages(sessionId, req.user.id);
+        const userMessages = messages.filter(m => m.role === 'user');
+        if (userMessages.length === 1) { // This was the first user message
+          await SessionService.updateSessionTitle(sessionId, req.user.id, content);
+        }
+      }
+
       res.status(201).json({
         success: true,
         data: message,

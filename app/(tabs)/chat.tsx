@@ -625,30 +625,62 @@ useEffect(() => {
     }
   };
 
+  // const createNewSession = async () => {
+  //   try {
+  //     const session = await SessionService.createSession({
+  //       title: `Chat - ${new Date().toLocaleDateString()}`,
+  //       description: 'MCP Assistant conversation'
+  //     });
+      
+  //     setCurrentSession(session);
+  //     await AsyncStorage.setItem(CURRENT_SESSION_KEY, session.id);
+
+  //     // Add welcome message to session
+  //     // const welcomeContent = '👋 **Welcome to MCP Chat!**\n\nI can help you access your Google Workspace data.\n\n**First time here?**\n1. Use `/connect` to link your Google account\n2. Then try `/calendar` or `/emails`\n3. Type `/help` to see all commands\n\n**Quick start:** Type `/connect` to begin!';
+
+  //     // await SessionService.addMessage(session.id, 'assistant', welcomeContent, {
+  //     //   isWelcome: true
+  //     // });
+
+  //     // setMessages([{
+  //     //   id: '1',
+  //     //   type: 'assistant',
+  //     //   content: welcomeContent,
+  //     //   timestamp: new Date().toISOString(),
+  //     // }]);
+
+  //   } catch (error) {
+  //     console.error('❌ Error creating session:', error);
+  //     throw error;
+  //   }
+  // };
+
   const createNewSession = async () => {
     try {
+      const generateSessionTitle = () => {
+        const adjectives = ['Brave', 'Calm', 'Swift', 'Bright', 'Witty', 'Quiet', 'Bold', 'Lucky', 'Clever', 'Gentle'];
+        const nouns = ['Lion', 'Ocean', 'Falcon', 'Forest', 'Mountain', 'River', 'Tiger', 'Sky', 'Storm', 'Phoenix'];
+  
+        const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+        const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
+  
+        const randomSuffix = Array.from({ length: 4 }, () =>
+          String.fromCharCode(97 + Math.floor(Math.random() * 26))
+        ).join('');
+  
+        return `${randomAdjective}-${randomNoun}-${randomSuffix}`;
+      };
+  
+      const sessionTitle = generateSessionTitle();
+  
       const session = await SessionService.createSession({
-        title: `Chat - ${new Date().toLocaleDateString()}`,
+        title: sessionTitle,
         description: 'MCP Assistant conversation'
       });
-      
+  
       setCurrentSession(session);
       await AsyncStorage.setItem(CURRENT_SESSION_KEY, session.id);
-
-      // Add welcome message to session
-      // const welcomeContent = '👋 **Welcome to MCP Chat!**\n\nI can help you access your Google Workspace data.\n\n**First time here?**\n1. Use `/connect` to link your Google account\n2. Then try `/calendar` or `/emails`\n3. Type `/help` to see all commands\n\n**Quick start:** Type `/connect` to begin!';
-
-      // await SessionService.addMessage(session.id, 'assistant', welcomeContent, {
-      //   isWelcome: true
-      // });
-
-      // setMessages([{
-      //   id: '1',
-      //   type: 'assistant',
-      //   content: welcomeContent,
-      //   timestamp: new Date().toISOString(),
-      // }]);
-
+  
     } catch (error) {
       console.error('❌ Error creating session:', error);
       throw error;
