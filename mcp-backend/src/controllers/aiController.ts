@@ -1,15 +1,42 @@
 import { Request, Response } from 'express';
 import { AuthenticatedRequest } from '../types';
-import { AIService } from '../services/aiService';
+import { AIService, AIModelType } from '../services/aiService';
 import { UserContext } from '../types/aiTools';
+import { supabase } from '../services/supabase';
+import { MCPToolRegistry } from '../services/mcpToolRegistry';
 
 export class AIController {
-  private static aiService: AIService;
+  /**
+   * Helper function to get user's preferred AI model and create appropriate AIService instance
+   */
+  private static async createAIServiceForUser(userId: string): Promise<AIService> {
+    try {
+      // Get user preferences from Supabase
+      const { data: preferencesData, error } = await supabase
+        .from('user_preferences')
+        .select('preferences')
+        .eq('user_id', userId)
+        .single();
+
+      if (error || !preferencesData?.preferences?.assistantBehavior?.preferred_model) {
+        // Default to gemini if no preference is set
+        console.log(`🤖 Using default model (Gemini) for user ${userId}`);
+        return new AIService('gemini');
+      }
+
+      const preferredModel = preferencesData.preferences.assistantBehavior.preferred_model as AIModelType;
+      console.log(`🤖 Using preferred model (${preferredModel}) for user ${userId}`);
+      return new AIService(preferredModel);
+    } catch (error) {
+      console.error('❌ Error fetching user preferences, defaulting to Gemini:', error);
+      return new AIService('gemini');
+    }
+  }
 
   static async initializeAI(): Promise<void> {
     try {
-      AIController.aiService = new AIService();
-      console.log('🧠 AI Service initialized successfully');
+      // Initialize with default model - individual requests will create their own instances
+      console.log('🧠 AI Service module initialized successfully');
     } catch (error) {
       console.error('❌ Failed to initialize AI Service:', error);
       // Don't throw - let the app continue without AI features
@@ -18,15 +45,6 @@ export class AIController {
 
   static async processNaturalLanguageQuery(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      if (!AIController.aiService) {
-        res.status(503).json({
-          success: false,
-          error: 'AI Service not available. Please check GEMINI_API_KEY configuration.',
-          timestamp: new Date().toISOString(),
-        });
-        return;
-      }
-
       if (!req.user) {
         res.status(401).json({
           success: false,
@@ -60,10 +78,12 @@ export class AIController {
           ...preferences
         },
         styleInstructions: preferences?.styleInstructions || '',
-        completeUserContext:completeUserContext || undefined
+        completeUserContext: completeUserContext || undefined
       };
 
-      const result = await AIController.aiService.processQuery(context, req.user.id);
+      // Create AI service instance with user's preferred model
+      const aiService = await AIController.createAIServiceForUser(req.user.id);
+      const result = await aiService.processQuery(context, req.user.id);
 
       res.json({
         success: result.success,
@@ -91,16 +111,7 @@ export class AIController {
 
   static async getAvailableTools(req: Request, res: Response): Promise<void> {
     try {
-      if (!AIController.aiService) {
-        res.status(503).json({
-          success: false,
-          error: 'AI Service not available',
-          timestamp: new Date().toISOString(),
-        });
-        return;
-      }
-
-      const registry = AIController.aiService['toolRegistry']; // Access private property for this endpoint
+      const registry = MCPToolRegistry.getInstance();
       const tools = registry.getAllToolMetadata();
 
       res.json({
@@ -131,15 +142,6 @@ export class AIController {
 
   static async getToolsByCategory(req: Request, res: Response): Promise<void> {
     try {
-      if (!AIController.aiService) {
-        res.status(503).json({
-          success: false,
-          error: 'AI Service not available',
-          timestamp: new Date().toISOString(),
-        });
-        return;
-      }
-
       const { category } = req.params;
       
       if (!category) {
@@ -151,7 +153,7 @@ export class AIController {
         return;
       }
 
-      const registry = AIController.aiService['toolRegistry'];
+      const registry = MCPToolRegistry.getInstance();
       const tools = registry.getToolsByCategory(category);
 
       res.json({

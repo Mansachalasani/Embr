@@ -2,10 +2,11 @@ import express from 'express';
 import multer from 'multer';
 import { authenticateToken } from '../middleware/auth';
 import { AzureSpeechService } from '../services/azureSpeechService';
-import { AIService } from '../services/aiService';
+import { AIService, AIModelType } from '../services/aiService';
 import { SessionService } from '../services/sessionService';
 import { UserContext } from '../types/aiTools';
 import { AuthenticatedRequest } from '../types';
+import { supabase } from '../services/supabase';
 
 const router = express.Router();
 
@@ -38,7 +39,33 @@ const upload = multer({
 });
 
 const speechService = AzureSpeechService.getInstance();
-const aiService = new AIService();
+
+/**
+ * Helper function to get user's preferred AI model and create appropriate AIService instance
+ */
+async function createAIServiceForUser(userId: string): Promise<AIService> {
+  try {
+    // Get user preferences from Supabase
+    const { data: preferencesData, error } = await supabase
+      .from('user_preferences')
+      .select('preferences')
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !preferencesData?.preferences?.assistantBehavior?.preferred_model) {
+      // Default to gemini if no preference is set
+      console.log(`🤖 Using default model (Gemini) for user ${userId}`);
+      return new AIService('gemini');
+    }
+
+    const preferredModel = preferencesData.preferences.assistantBehavior.preferred_model as AIModelType;
+    console.log(`🤖 Using preferred model (${preferredModel}) for user ${userId}`);
+    return new AIService(preferredModel);
+  } catch (error) {
+    console.error('❌ Error fetching user preferences, defaulting to Gemini:', error);
+    return new AIService('gemini');
+  }
+}
 
 /**
  * Enable conversational mode for a user
@@ -219,6 +246,8 @@ router.post('/speak', authenticateToken, upload.single('audio'), async (req: Aut
       },
     };
 
+    // Create AI service instance with user's preferred model
+    const aiService = await createAIServiceForUser(req.user.id);
     const aiResponse = await aiService.processQuery(context, req.user.id);
     
     if (!aiResponse.success) {
@@ -342,6 +371,8 @@ router.post('/text', authenticateToken, async (req: AuthenticatedRequest, res) =
       },
     };
 
+    // Create AI service instance with user's preferred model
+    const aiService = await createAIServiceForUser(req.user.id);
     const aiResponse = await aiService.processQuery(context, req.user.id);
 
     if (!aiResponse.success) {

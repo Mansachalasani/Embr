@@ -50,6 +50,7 @@ export interface UserPersonalizationData {
     personality: 'helpful' | 'witty' | 'serious' | 'encouraging' | 'analytical' | 'creative';
     error_handling: 'apologetic' | 'direct' | 'educational' | 'problem_solving';
     uncertainty_handling: 'admit_limits' | 'provide_alternatives' | 'research_first' | 'ask_clarification';
+    preferred_model: 'gemini' | 'gpt-4';
   };
 
   // Domain-Specific Preferences

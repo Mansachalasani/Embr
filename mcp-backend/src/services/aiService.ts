@@ -1,25 +1,66 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { AIToolMetadata, AIToolSelection, AIResponse, UserContext } from '../types/aiTools';
 import { MCPToolRegistry } from './mcpToolRegistry';
 import { SessionService } from './sessionService';
 import { supabase } from './supabase';
 
+export type AIModelType = 'gemini' | 'gpt-4';
+
 export class AIService {
-  private genAI: GoogleGenerativeAI;
+  private genAI: GoogleGenerativeAI | null = null;
+  private openai: OpenAI | null = null;
   private model: any;
+  private modelType: AIModelType;
   private toolRegistry: MCPToolRegistry;
   private responseCache: Map<string, any> = new Map();
   private cacheTimeout = 5 * 60 * 1000; // 5 minutes
 
-  constructor() {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error('GEMINI_API_KEY environment variable is required');
+  constructor(modelType: AIModelType = 'gemini') {
+    this.modelType = modelType;
+    
+    if (modelType === 'gemini') {
+      const geminiKey = process.env.GEMINI_API_KEY;
+      if (!geminiKey) {
+        throw new Error('GEMINI_API_KEY environment variable is required for Gemini model');
+      }
+      this.genAI = new GoogleGenerativeAI(geminiKey);
+      this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    } else if (modelType === 'gpt-4') {
+      const openaiKey = process.env.OPENAI_API_KEY;
+      if (!openaiKey) {
+        throw new Error('OPENAI_API_KEY environment variable is required for GPT-4 model');
+      }
+      this.openai = new OpenAI({ apiKey: openaiKey });
     }
     
-    this.genAI = new GoogleGenerativeAI(apiKey);
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     this.toolRegistry = MCPToolRegistry.getInstance();
+  }
+
+  /**
+   * Unified method to generate content with either model
+   */
+  private async generateContent(prompt: string): Promise<string> {
+    try {
+      if (this.modelType === 'gemini' && this.model) {
+        const result = await this.model.generateContent(prompt);
+        const response = await result.response;
+        return response.text().trim();
+      } else if (this.modelType === 'gpt-4' && this.openai) {
+        const completion = await this.openai.chat.completions.create({
+          model: 'gpt-4o',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.7,
+          max_tokens: 4000,
+        });
+        return completion.choices[0]?.message?.content?.trim() || '';
+      } else {
+        throw new Error(`Invalid model configuration: ${this.modelType}`);
+      }
+    } catch (error) {
+      console.error(`❌ Error generating content with ${this.modelType}:`, error);
+      throw error;
+    }
   }
 
   /**
@@ -347,9 +388,7 @@ console.log(context.personalization)
     `
 
     try {
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      let text = response.text().trim();
+      let text = await this.generateContent(prompt);
 
       // Sanitize for safety
       if (text.startsWith("```")) {
@@ -657,9 +696,7 @@ console.log(context.personalization)
     `;
 
     try {
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      return response.text().trim();
+      return await this.generateContent(prompt);
     } catch (error) {
       console.error('❌ Error generating response:', error);
       return 'I found the information you requested, but had trouble formatting the response. Please check the raw data above.';
