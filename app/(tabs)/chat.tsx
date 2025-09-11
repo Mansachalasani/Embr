@@ -631,7 +631,7 @@ useEffect(() => {
         title: `Chat - ${new Date().toLocaleDateString()}`,
         description: 'MCP Assistant conversation'
       });
-      console.log(session, 'meow')
+      
       setCurrentSession(session);
       await AsyncStorage.setItem(CURRENT_SESSION_KEY, session.id);
 
