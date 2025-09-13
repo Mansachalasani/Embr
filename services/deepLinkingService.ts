@@ -53,7 +53,7 @@ export class DeepLinkingService {
     {
       name: 'Amazon Search',
       description: 'Search for products on Amazon',
-      keywords: ['amazon', 'shop', 'buy', 'purchase', 'order'],
+      keywords: ['amazon'],
       execute: async (query: string) => {
         // Extract search terms
         const searchMatch = query.match(/(?:amazon|shop|buy|purchase|order)\s+(.+?)(?:\s+under\s+|\s+below\s+|\s*$)/i);
@@ -88,7 +88,7 @@ export class DeepLinkingService {
     {
       name: 'Spotify Play',
       description: 'Play music on Spotify',
-      keywords: ['spotify', 'play'],
+      keywords: ['spotify'],
       execute: async (query: string) => {
         // Extract song/artist name
         const musicMatch = query.match(/(?:play|song|music)\s+(.+?)(?:\s+on\s+spotify|\s*$)/i);
