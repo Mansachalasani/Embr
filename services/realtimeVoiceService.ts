@@ -452,21 +452,24 @@ class RealtimeVoiceService {
             console.log('🔊 Web TTS started');
             hasStarted = true;
             this.isSpeaking = true;
+            this.isProcessing = false;
             this.callbacks.onAISpeaking?.();
           };
 
           utterance.onend = () => {
             console.log('✅ Web TTS finished');
+            this.isProcessing = false;
             this.isSpeaking = false;
 
             // Auto-restart listening after a brief pause for truly conversational experience
+            console.log(this.conversationActive, this.isProcessing,'kkkkkkk');
             if (this.conversationActive && !this.isProcessing) {
-              setTimeout(() => {
+              console.log(this.conversationActive && !this.isListening && !this.isProcessing,',mmmmmmm')
                 if (this.conversationActive && !this.isListening && !this.isProcessing) {
                   console.log('🔄 Auto-restarting listening after TTS...');
                   this.restartListening();
                 }
-              }, 800); // Brief pause for natural conversation flow
+             
             }
 
             resolve();

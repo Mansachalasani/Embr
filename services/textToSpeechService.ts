@@ -106,8 +106,8 @@ class TextToSpeechService {
       // Default options
       const speechOptions: Speech.SpeechOptions = {
         language: options.language || (Platform.OS === 'ios' ? 'en-US' : 'en_US'),
-        pitch: options.pitch || 1.0,
-        rate: options.rate || 0.8, // Slightly slower for better comprehension
+        pitch: options.pitch || 1.5,
+        rate: options.rate || 1.2, // Slightly slower for better comprehension
         voice: options.voice,
         onStart: () => {
           console.log('🔊 TTS started speaking');
