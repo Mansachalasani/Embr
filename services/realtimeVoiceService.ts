@@ -56,6 +56,8 @@ class RealtimeVoiceService {
   private hasPermission = false;
   private hasTTSPermission = false;
   private userHasInteracted = false;
+  private selectedVoice: SpeechSynthesisVoice | null = null;
+  private availableVoices: SpeechSynthesisVoice[] = [];
 
   constructor() {
     this.initializeAPIs();
@@ -147,6 +149,9 @@ class RealtimeVoiceService {
       // Initialize Web Speech Synthesis
       this.webSynthesis = window.speechSynthesis;
 
+      // Load available voices
+      this.loadAvailableVoices();
+
       // Test TTS availability and prepare for user interaction
       if (this.webSynthesis) {
         this.prepareTTSForUserInteraction();
@@ -229,6 +234,34 @@ class RealtimeVoiceService {
       console.error('❌ Error initializing mobile voice APIs:', error);
       this.hasPermission = false;
     }
+  }
+
+  private loadAvailableVoices() {
+    if (Platform.OS !== 'web' || !this.webSynthesis) return;
+
+    const loadVoices = () => {
+      const voices = this.webSynthesis.getVoices();
+      if (voices.length > 0) {
+        this.availableVoices = voices.filter(voice => voice.lang.startsWith('en'));
+
+        // Select default voice (prefer Google or higher quality voices)
+        const preferredVoice = this.availableVoices.find(voice =>
+          voice.name.toLowerCase().includes('google') ||
+          voice.name.toLowerCase().includes('microsoft') ||
+          voice.name.toLowerCase().includes('alex') ||
+          voice.name.toLowerCase().includes('samantha')
+        );
+
+        this.selectedVoice = preferredVoice || this.availableVoices[0] || null;
+        console.log('🔊 Available voices:', this.availableVoices.length, 'Selected:', this.selectedVoice?.name);
+      }
+    };
+
+    // Load voices immediately if available
+    loadVoices();
+
+    // Also listen for voices changed event (some browsers load voices asynchronously)
+    this.webSynthesis.addEventListener('voiceschanged', loadVoices);
   }
 
   private prepareTTSForUserInteraction() {
@@ -408,6 +441,11 @@ class RealtimeVoiceService {
           utterance.volume = options.volume || 0.8;
           utterance.lang = options.language || 'en-US';
 
+          // Use selected voice if available
+          if (this.selectedVoice) {
+            utterance.voice = this.selectedVoice;
+          }
+
           let hasStarted = false;
 
           utterance.onstart = () => {
@@ -420,6 +458,17 @@ class RealtimeVoiceService {
           utterance.onend = () => {
             console.log('✅ Web TTS finished');
             this.isSpeaking = false;
+
+            // Auto-restart listening after a brief pause for truly conversational experience
+            if (this.conversationActive && !this.isProcessing) {
+              setTimeout(() => {
+                if (this.conversationActive && !this.isListening && !this.isProcessing) {
+                  console.log('🔄 Auto-restarting listening after TTS...');
+                  this.restartListening();
+                }
+              }, 800); // Brief pause for natural conversation flow
+            }
+
             resolve();
           };
 
@@ -618,6 +667,32 @@ class RealtimeVoiceService {
       return this.isWebSpeechSupported && !!this.webSynthesis;
     }
     return !!(Voice && Tts);
+  }
+
+  getAvailableVoices(): SpeechSynthesisVoice[] {
+    if (Platform.OS === 'web') {
+      return this.availableVoices;
+    }
+    return []; // Mobile TTS voices handled differently
+  }
+
+  setVoice(voiceName: string): boolean {
+    if (Platform.OS === 'web') {
+      const voice = this.availableVoices.find(v => v.name === voiceName);
+      if (voice) {
+        this.selectedVoice = voice;
+        console.log('🎤 Voice changed to:', voice.name);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  getCurrentVoice(): string | null {
+    if (Platform.OS === 'web' && this.selectedVoice) {
+      return this.selectedVoice.name;
+    }
+    return null;
   }
 
   async destroy(): Promise<void> {
