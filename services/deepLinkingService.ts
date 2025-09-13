@@ -10,44 +10,44 @@ export interface DeepLinkAction {
 export class DeepLinkingService {
   private static actions: DeepLinkAction[] = [
     // Phone & Contacts
-    {
-      name: 'Make Phone Call',
-      description: 'Make a phone call to a contact or number',
-      keywords: ['call', 'phone', 'dial', 'ring'],
-      execute: async (query: string) => {
-        const phoneMatch = query.match(/(\+?\d[\d\s\-()]+)/);
-        const phoneNumber = phoneMatch ? phoneMatch[1].replace(/[^\d+]/g, '') : null;
+    // {
+    //   name: 'Make Phone Call',
+    //   description: 'Make a phone call to a contact or number',
+    //   keywords: ['call', 'phone', 'dial', 'ring'],
+    //   execute: async (query: string) => {
+    //     const phoneMatch = query.match(/(\+?\d[\d\s\-()]+)/);
+    //     const phoneNumber = phoneMatch ? phoneMatch[1].replace(/[^\d+]/g, '') : null;
         
-        if (phoneNumber) {
-          const url = `tel:${phoneNumber}`;
-          const canOpen = await Linking.canOpenURL(url);
-          if (canOpen) {
-            await Linking.openURL(url);
-            return true;
-          }
-        }
-        return false;
-      }
-    },
-    {
-      name: 'Open Contacts',
-      description: 'Open the contacts app',
-      keywords: ['contacts', 'phonebook', 'address book'],
-      execute: async (query: string) => {
-        try {
-          await Linking.openURL('contacts://');
-          return true;
-        } catch {
-          // Fallback for different platforms
-          try {
-            await Linking.openURL('contact://');
-            return true;
-          } catch {
-            return false;
-          }
-        }
-      }
-    },
+    //     if (phoneNumber) {
+    //       const url = `tel:${phoneNumber}`;
+    //       const canOpen = await Linking.canOpenURL(url);
+    //       if (canOpen) {
+    //         await Linking.openURL(url);
+    //         return true;
+    //       }
+    //     }
+    //     return false;
+    //   }
+    // },
+    // {
+    //   name: 'Open Contacts',
+    //   description: 'Open the contacts app',
+    //   keywords: ['contacts', 'phonebook', 'address book'],
+    //   execute: async (query: string) => {
+    //     try {
+    //       await Linking.openURL('contacts://');
+    //       return true;
+    //     } catch {
+    //       // Fallback for different platforms
+    //       try {
+    //         await Linking.openURL('contact://');
+    //         return true;
+    //       } catch {
+    //         return false;
+    //       }
+    //     }
+    //   }
+    // },
     
     // // Amazon Shopping
     {
@@ -127,27 +127,27 @@ export class DeepLinkingService {
     },
     
     // // Maps & Navigation
-    {
-      name: 'Open Maps',
-      description: 'Open maps and navigate to a location',
-      keywords: ['maps', 'navigate', 'directions', 'location', 'go to'],
-      execute: async (query: string) => {
-        const locationMatch = query.match(/(?:maps|navigate|directions|go to)\s+(.+)/i);
-        const location = locationMatch ? locationMatch[1] : '';
+    // {
+    //   name: 'Open Maps',
+    //   description: 'Open maps and navigate to a location',
+    //   keywords: ['maps', 'navigate', 'directions', 'location', 'go to'],
+    //   execute: async (query: string) => {
+    //     const locationMatch = query.match(/(?:maps|navigate|directions|go to)\s+(.+)/i);
+    //     const location = locationMatch ? locationMatch[1] : '';
         
-        if (location.trim()) {
-          const encodedLocation = encodeURIComponent(location.trim());
-          const mapsUrl = `https://maps.google.com/maps?q=${encodedLocation}`;
+    //     if (location.trim()) {
+    //       const encodedLocation = encodeURIComponent(location.trim());
+    //       const mapsUrl = `https://maps.google.com/maps?q=${encodedLocation}`;
           
-          const canOpen = await Linking.canOpenURL(mapsUrl);
-          if (canOpen) {
-            await Linking.openURL(mapsUrl);
-            return true;
-          }
-        }
-        return false;
-      }
-    },
+    //       const canOpen = await Linking.canOpenURL(mapsUrl);
+    //       if (canOpen) {
+    //         await Linking.openURL(mapsUrl);
+    //         return true;
+    //       }
+    //     }
+    //     return false;
+    //   }
+    // },
     
     // // YouTube
     {
