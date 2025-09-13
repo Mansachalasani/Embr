@@ -26,6 +26,7 @@ import { ThinkingAnimation } from '../../components/ThinkingAnimation';
 import { StreamingMessage } from '../../components/StreamingMessage';
 import { StreamingCallbacks } from '../../services/streamingService';
 import { VoiceChat } from '../../components/VoiceChat';
+import { RealtimeVoiceChat } from '../../components/RealtimeVoiceChat';
 import { FileOperationCard } from '../../components/FileOperationCard';
 import { DocumentAnalysisCard } from '../../components/DocumentAnalysisCard';
 import { DriveFileCard } from '../../components/DriveFileCard';
@@ -1562,13 +1563,13 @@ useEffect(() => {
                 )}
               <View style={{marginTop:50}}>
 
-                <VoiceChat
+                <RealtimeVoiceChat
                   sessionId={currentSession?.id}
                   onVoiceMessage={handleVoiceMessage}
                   onRecordingStateChange={setIsRecordingVoice}
                   disabled={isLoading}
                   autoRecording={autoRecord}
-                 
+                  naturalConversation={autoRecord}
                 />
               </View>
               </View>
