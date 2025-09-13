@@ -27,6 +27,7 @@ import { StreamingMessage } from '../../components/StreamingMessage';
 import { StreamingCallbacks } from '../../services/streamingService';
 import { VoiceChat } from '../../components/VoiceChat';
 import { RealtimeVoiceChat } from '../../components/RealtimeVoiceChat';
+import { realtimeVoiceService } from '../../services/realtimeVoiceService';
 import { FileOperationCard } from '../../components/FileOperationCard';
 import { DocumentAnalysisCard } from '../../components/DocumentAnalysisCard';
 import { DriveFileCard } from '../../components/DriveFileCard';
@@ -460,6 +461,67 @@ export default function Chat() {
       borderColor: 'rgba(255, 215, 0, 0.6)', // Gold
       backgroundColor: 'rgba(255, 215, 0, 0.12)',
     },
+
+    // Voice selection modal styles
+    voiceSelectionModal: {
+      margin: 20,
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      padding: 20,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+      elevation: 5,
+      maxHeight: '80%',
+    },
+    voiceSelectionTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginBottom: 16,
+      textAlign: 'center',
+    },
+    voiceItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    selectedVoiceItem: {
+      backgroundColor: colors.primary + '20',
+      borderColor: colors.primary,
+    },
+    voiceInfo: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    voiceName: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    voiceLanguage: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    voiceSelectionClose: {
+      marginTop: 16,
+      padding: 12,
+      backgroundColor: colors.surfaceVariant,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    voiceSelectionCloseText: {
+      fontSize: 16,
+      color: colors.text,
+      fontWeight: '600',
+    },
   });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -481,6 +543,9 @@ export default function Chat() {
   const [showVoicePopup, setShowVoicePopup] = useState(false);
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const [forceStopVoice, setForceStopVoice] = useState(false);
+  const [showVoiceSelection, setShowVoiceSelection] = useState(false);
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState<string>('');
   const flatListRef = useRef<FlatList>(null);
   const [autoRecord, setautoRecord] = useState(false)
   const messageCache = useRef<Map<string, ChatMessage[]>>(new Map());
@@ -591,6 +656,34 @@ useEffect(() => {
       fireWave4.setValue(0);
     }
   }, [isRecordingVoice]);
+
+  // Load available voices on component mount
+  useEffect(() => {
+    const loadVoices = () => {
+      const voices = realtimeVoiceService.getAvailableVoices();
+      setAvailableVoices(voices);
+
+      // Set current voice if available
+      const currentVoice = realtimeVoiceService.getCurrentVoice();
+      if (currentVoice) {
+        setSelectedVoice(currentVoice);
+      } else if (voices.length > 0) {
+        setSelectedVoice(voices[0].name);
+      }
+    };
+
+    // Load voices immediately
+    loadVoices();
+
+    // Also listen for voices changed event (for web browsers)
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
+
+      return () => {
+        window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
+      };
+    }
+  }, []);
 
   const initializeAppMode = async () => {
     try {
@@ -1094,6 +1187,15 @@ useEffect(() => {
       console.error('❌ Error starting push-to-talk recording:', error);
       setIsRecordingVoice(false);
     }
+  };
+
+  const handleVoiceSelection = (voiceName: string) => {
+    const success = realtimeVoiceService.setVoice(voiceName);
+    if (success) {
+      setSelectedVoice(voiceName);
+      console.log('🎤 Voice changed to:', voiceName);
+    }
+    setShowVoiceSelection(false);
   };
 
   const stopPushToTalkRecording = async () => {
@@ -1622,10 +1724,7 @@ useEffect(() => {
                 <Text style={styles.voiceModalTitle}>Voice Chat</Text>
                 <TouchableOpacity
                   style={styles.voiceSelectionButton}
-                  onPress={() => {
-                    // TODO: Open voice selection modal
-                    console.log('Open voice selection');
-                  }}
+                  onPress={() => setShowVoiceSelection(true)}
                 >
                   <Ionicons name="person-outline" size={20} color={colors.primary} />
                 </TouchableOpacity>
@@ -1654,6 +1753,56 @@ useEffect(() => {
                 onPress={handleCloseVoiceModal}
               >
                 <Text style={styles.voiceModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Voice Selection Modal */}
+        <Modal
+          visible={showVoiceSelection}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={() => setShowVoiceSelection(false)}
+        >
+          <View style={styles.voiceModalOverlay}>
+            <View style={styles.voiceSelectionModal}>
+              <Text style={styles.voiceSelectionTitle}>Select Voice</Text>
+
+              <FlatList
+                data={availableVoices}
+                keyExtractor={(item) => item.name}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[
+                      styles.voiceItem,
+                      selectedVoice === item.name && styles.selectedVoiceItem
+                    ]}
+                    onPress={() => handleVoiceSelection(item.name)}
+                  >
+                    <Ionicons
+                      name={selectedVoice === item.name ? "checkmark-circle" : "person-outline"}
+                      size={24}
+                      color={selectedVoice === item.name ? colors.primary : colors.textSecondary}
+                    />
+                    <View style={styles.voiceInfo}>
+                      <Text style={styles.voiceName}>{item.name}</Text>
+                      <Text style={styles.voiceLanguage}>
+                        {item.lang} • {item.localService ? 'Local' : 'Remote'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+                showsVerticalScrollIndicator={false}
+                maxToRenderPerBatch={10}
+                windowSize={10}
+              />
+
+              <TouchableOpacity
+                style={styles.voiceSelectionClose}
+                onPress={() => setShowVoiceSelection(false)}
+              >
+                <Text style={styles.voiceSelectionCloseText}>Close</Text>
               </TouchableOpacity>
             </View>
           </View>
