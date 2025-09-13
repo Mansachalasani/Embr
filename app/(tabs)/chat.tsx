@@ -351,11 +351,28 @@ export default function Chat() {
       shadowRadius: 16,
       elevation: 16,
     },
+    voiceModalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      width: '100%',
+      marginBottom: 8,
+    },
     voiceModalTitle: {
       fontSize: 20,
       fontWeight: '700',
       color: colors.text,
-      marginBottom: 8,
+      flex: 1,
+      textAlign: 'center',
+    },
+    voiceSelectionButton: {
+      position: 'absolute',
+      right: 0,
+      padding: 8,
+      borderRadius: 20,
+      backgroundColor: colors.surfaceVariant,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     voiceModalSubtitle: {
       fontSize: 16,
@@ -1292,13 +1309,11 @@ useEffect(() => {
             </View>
           )}
 
-          <Text style={[
+          {renderFormattedText(item.content, [
             styles.messageText,
             isUser ? styles.userText : styles.assistantText,
             item.metadata?.error && styles.errorText
-          ]}>
-            {item.content}
-          </Text>
+          ])}
 
           {/* Voice message indicator */}
           {item.metadata?.isVoice && (
@@ -1327,6 +1342,114 @@ useEffect(() => {
   };
 
   const suggestedCommands = ['/connect', '/status', '/help', '/calendar', '/emails'];
+
+  // Function to render text with basic markdown formatting
+  const renderFormattedText = (content: string, baseStyle: any[]) => {
+    // Process line by line for better structure
+    const lines = content.split('\n');
+
+    return (
+      <View>
+        {lines.map((line, lineIndex) => {
+          // Handle headers (# ## ###)
+          const headerMatch = line.match(/^(#{1,3})\s+(.+)$/);
+          if (headerMatch) {
+            const level = headerMatch[1].length;
+            const headerText = headerMatch[2];
+            return (
+              <Text key={lineIndex} style={[
+                ...baseStyle,
+                {
+                  fontWeight: 'bold',
+                  fontSize: level === 1 ? 20 : level === 2 ? 18 : 16,
+                  marginTop: lineIndex > 0 ? 8 : 0,
+                  marginBottom: 4
+                }
+              ]}>
+                {renderInlineFormatting(headerText, baseStyle)}
+              </Text>
+            );
+          }
+
+          // Handle bullet points (- or *)
+          const bulletMatch = line.match(/^[-*]\s+(.+)$/);
+          if (bulletMatch) {
+            const bulletText = bulletMatch[1];
+            return (
+              <Text key={lineIndex} style={baseStyle}>
+                • {renderInlineFormatting(bulletText, baseStyle)}
+              </Text>
+            );
+          }
+
+          // Handle numbered lists (1. 2. etc)
+          const numberedMatch = line.match(/^(\d+)\.\s+(.+)$/);
+          if (numberedMatch) {
+            const number = numberedMatch[1];
+            const listText = numberedMatch[2];
+            return (
+              <Text key={lineIndex} style={baseStyle}>
+                {number}. {renderInlineFormatting(listText, baseStyle)}
+              </Text>
+            );
+          }
+
+          // Regular line
+          return (
+            <Text key={lineIndex} style={baseStyle}>
+              {renderInlineFormatting(line, baseStyle)}
+            </Text>
+          );
+        })}
+      </View>
+    );
+  };
+
+  // Helper function to render inline formatting (bold, italic, code)
+  const renderInlineFormatting = (text: string, baseStyle: any[]) => {
+    // Split text by markdown patterns while preserving the markers
+    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
+
+    return parts.map((part, index) => {
+      // Handle bold text **text**
+      if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+        const boldText = part.slice(2, -2);
+        return (
+          <Text key={index} style={{ fontWeight: 'bold' }}>
+            {boldText}
+          </Text>
+        );
+      }
+      // Handle italic text *text*
+      else if (part.startsWith('*') && part.endsWith('*') && part.length > 2 && !part.startsWith('**')) {
+        const italicText = part.slice(1, -1);
+        return (
+          <Text key={index} style={{ fontStyle: 'italic' }}>
+            {italicText}
+          </Text>
+        );
+      }
+      // Handle inline code `text`
+      else if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+        const codeText = part.slice(1, -1);
+        return (
+          <Text key={index} style={{
+            fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+            backgroundColor: colors.surfaceVariant,
+            paddingHorizontal: 4,
+            paddingVertical: 2,
+            borderRadius: 4
+          }}>
+            {codeText}
+          </Text>
+        );
+      }
+      // Regular text
+      else {
+        return part;
+      }
+    });
+  };
 
   if (isSessionLoading) {
     return (
@@ -1494,8 +1617,20 @@ useEffect(() => {
               onPress={handleCloseVoiceModal}
             />
             <View style={styles.voiceModalContainer}>
-             
-              
+              {/* Modal Header with Voice Selection Button */}
+              <View style={styles.voiceModalHeader}>
+                <Text style={styles.voiceModalTitle}>Voice Chat</Text>
+                <TouchableOpacity
+                  style={styles.voiceSelectionButton}
+                  onPress={() => {
+                    // TODO: Open voice selection modal
+                    console.log('Open voice selection');
+                  }}
+                >
+                  <Ionicons name="person-outline" size={20} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
+
               {/* Big Push-to-Talk Button with Fire Wave Effects */}
               <View style={styles.voiceButtonContainer}>
                 {/* Fire Wave Effects */}
