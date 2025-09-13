@@ -23,6 +23,7 @@ interface RealtimeVoiceChatProps {
   autoRecording?: boolean;
   naturalConversation?: boolean;
   disabled?: boolean;
+  forceStop?: boolean; // New prop to force stop conversation
 }
 
 const processingMessages = [
@@ -44,7 +45,8 @@ export function RealtimeVoiceChat({
   onRecordingStateChange,
   autoRecording,
   naturalConversation,
-  disabled = false
+  disabled = false,
+  forceStop = false
 }: RealtimeVoiceChatProps) {
   const { colors } = useTheme();
   const [isListening, setIsListening] = useState(false);
@@ -362,6 +364,24 @@ export function RealtimeVoiceChat({
 
     initialize();
   }, []);
+
+  // Cleanup effect - stop conversation when component unmounts
+  useEffect(() => {
+    return () => {
+      console.log('🧹 RealtimeVoiceChat component unmounting, stopping conversation...');
+      if (conversationActive) {
+        realtimeVoiceService.stopConversation().catch(console.error);
+      }
+    };
+  }, [conversationActive]);
+
+  // Handle force stop from parent component
+  useEffect(() => {
+    if (forceStop && conversationActive) {
+      console.log('🛑 Force stopping conversation from parent component');
+      stopConversation();
+    }
+  }, [forceStop, conversationActive]);
 
   // Auto-start conversation if enabled
   useEffect(() => {

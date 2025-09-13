@@ -244,12 +244,24 @@ class RealtimeVoiceService {
       if (voices.length > 0) {
         this.availableVoices = voices.filter(voice => voice.lang.startsWith('en'));
 
-        // Select default voice (prefer Google or higher quality voices)
-        const preferredVoice = this.availableVoices.find(voice =>
-          voice.name.toLowerCase().includes('google') ||
-          voice.name.toLowerCase().includes('microsoft') ||
-          voice.name.toLowerCase().includes('alex') ||
-          voice.name.toLowerCase().includes('samantha')
+        // Select default voice with better priority for natural, assistant-like voices
+        const preferredVoice = this.availableVoices.find(voice => {
+          const name = voice.name.toLowerCase();
+          // Priority 1: High-quality neural/premium voices
+          if (name.includes('neural') || name.includes('premium') || name.includes('enhanced')) return true;
+          // Priority 2: Female voices that sound assistant-like
+          if (name.includes('zira') || name.includes('eva') || name.includes('samantha')) return true;
+          if (name.includes('siri') || name.includes('female')) return true;
+          // Priority 3: Google voices (usually high quality)
+          if (name.includes('google')) return true;
+          // Priority 4: Other known good voices
+          if (name.includes('microsoft') || name.includes('alex')) return true;
+          return false;
+        }) ||
+        // Fallback: prefer female voices in general (tend to sound more assistant-like)
+        this.availableVoices.find(voice =>
+          voice.name.toLowerCase().includes('female') ||
+          !voice.name.toLowerCase().includes('male')
         );
 
         this.selectedVoice = preferredVoice || this.availableVoices[0] || null;
@@ -355,6 +367,42 @@ class RealtimeVoiceService {
     }
   }
 
+  private preprocessTextForSpeech(text: string): string {
+    return text
+      // Remove markdown formatting that sounds weird when spoken
+      .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold
+      .replace(/\*(.*?)\*/g, '$1') // Remove italic
+      .replace(/`(.*?)`/g, '$1') // Remove code backticks
+      .replace(/#{1,6}\s*/g, '') // Remove markdown headers
+
+      // Replace common symbols with spoken equivalents
+      .replace(/&/g, ' and ')
+      .replace(/@/g, ' at ')
+      .replace(/#/g, ' hashtag ')
+      .replace(/\$/g, ' dollars ')
+      .replace(/%/g, ' percent ')
+      .replace(/\+/g, ' plus ')
+      .replace(/=/g, ' equals ')
+
+      // Improve pronunciation of common terms
+      .replace(/\bAPI\b/g, 'A P I')
+      .replace(/\bURL\b/g, 'U R L')
+      .replace(/\bHTML\b/g, 'H T M L')
+      .replace(/\bCSS\b/g, 'C S S')
+      .replace(/\bJS\b/g, 'JavaScript')
+      .replace(/\bUI\b/g, 'user interface')
+      .replace(/\bUX\b/g, 'user experience')
+
+      // Add natural pauses
+      .replace(/\.\s+/g, '. ') // Ensure pause after periods
+      .replace(/,\s+/g, ', ') // Ensure pause after commas
+      .replace(/:\s+/g, ': ') // Ensure pause after colons
+
+      // Remove excessive whitespace
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   async startListening(): Promise<void> {
     if (this.isListening || this.isSpeaking || !this.hasPermission) {
       console.log('⚠️ Cannot start listening:', { isListening: this.isListening, isSpeaking: this.isSpeaking, hasPermission: this.hasPermission });
@@ -419,8 +467,11 @@ class RealtimeVoiceService {
       return;
     }
 
+    // Preprocess text for better speech synthesis
+    const processedText = this.preprocessTextForSpeech(text);
+
     try {
-      console.log('🔊 Speaking:', text.substring(0, 50));
+      console.log('🔊 Speaking:', processedText.substring(0, 50));
 
       if (Platform.OS === 'web' && this.webSynthesis) {
         // Check if user has interacted and TTS is available
@@ -435,10 +486,11 @@ class RealtimeVoiceService {
         }
 
         return new Promise((resolve, reject) => {
-          const utterance = new SpeechSynthesisUtterance(text);
-          utterance.rate = options.rate || 0.9;
-          utterance.pitch = options.pitch || 1;
-          utterance.volume = options.volume || 0.8;
+          const utterance = new SpeechSynthesisUtterance(processedText);
+          // Optimized speech parameters for more natural, assistant-like voice
+          utterance.rate = options.rate || 0.85; // Slightly slower for clearer speech
+          utterance.pitch = options.pitch || 0.95; // Slightly lower pitch for warmer tone
+          utterance.volume = options.volume || 0.9; // Higher volume for clarity
           utterance.lang = options.language || 'en-US';
 
           // Use selected voice if available
@@ -524,15 +576,18 @@ class RealtimeVoiceService {
         this.isSpeaking = true;
         this.callbacks.onAISpeaking?.();
 
-        await Tts.speak(text, {
+        await Tts.speak(processedText, {
           androidParams: {
-            KEY_PARAM_PAN: -1,
-            KEY_PARAM_VOLUME: options.volume || 0.8,
+            KEY_PARAM_PAN: 0, // Center audio
+            KEY_PARAM_VOLUME: options.volume || 0.9,
             KEY_PARAM_STREAM: 'STREAM_MUSIC',
           },
-          iosVoiceId: 'com.apple.ttsbundle.Moira-compact',
-          rate: options.rate || 0.5,
-          pitch: options.pitch || 1.0,
+          // Use higher quality iOS voices - prefer natural female voices
+          iosVoiceId: options.language?.includes('UK') ?
+            'com.apple.ttsbundle.Kate-compact' :
+            'com.apple.ttsbundle.Samantha-compact', // Samantha is more natural than Moira
+          rate: options.rate || 0.6, // Slightly slower for mobile clarity
+          pitch: options.pitch || 0.95, // Slightly lower pitch for warmer tone
         });
       } else {
         // No TTS available, just simulate speaking
@@ -540,7 +595,7 @@ class RealtimeVoiceService {
         this.callbacks.onAISpeaking?.();
         setTimeout(() => {
           this.isSpeaking = false;
-        }, Math.min(text.length * 50, 3000)); // Simulate reading time
+        }, Math.min(processedText.length * 50, 3000)); // Simulate reading time
       }
     } catch (error) {
       console.error('❌ Error speaking text:', error);

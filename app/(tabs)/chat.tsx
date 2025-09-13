@@ -463,6 +463,7 @@ export default function Chat() {
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [showVoicePopup, setShowVoicePopup] = useState(false);
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [forceStopVoice, setForceStopVoice] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const [autoRecord, setautoRecord] = useState(false)
   const messageCache = useRef<Map<string, ChatMessage[]>>(new Map());
@@ -1015,6 +1016,18 @@ useEffect(() => {
     }
   };
 
+  const handleCloseVoiceModal = () => {
+    console.log('🔒 Closing voice modal and stopping conversation');
+    setForceStopVoice(true);
+    setShowVoicePopup(false);
+    setIsRecordingVoice(false);
+
+    // Reset force stop after a brief delay
+    setTimeout(() => {
+      setForceStopVoice(false);
+    }, 500);
+  };
+
   const startContinuousVoiceMode = async () => {
     try {
       if (!currentSession?.id) {
@@ -1473,18 +1486,12 @@ useEffect(() => {
           visible={showVoicePopup}
           animationType="slide"
           transparent={true}
-          onRequestClose={() => {
-            setShowVoicePopup(false);
-            setIsRecordingVoice(false);
-          }}
+          onRequestClose={handleCloseVoiceModal}
         >
           <View style={styles.voiceModalOverlay}>
             <TouchableOpacity
               style={styles.voiceModalBackdrop}
-              onPress={() => {
-                setShowVoicePopup(false);
-                setIsRecordingVoice(false);
-              }}
+              onPress={handleCloseVoiceModal}
             />
             <View style={styles.voiceModalContainer}>
              
@@ -1502,13 +1509,14 @@ useEffect(() => {
                   disabled={isLoading}
                   autoRecording={autoRecord}
                   naturalConversation={autoRecord}
+                  forceStop={forceStopVoice}
                 />
               </View>
               </View>
               
               <TouchableOpacity
                 style={styles.voiceModalCancelButton}
-                onPress={() => setShowVoicePopup(false)}
+                onPress={handleCloseVoiceModal}
               >
                 <Text style={styles.voiceModalCancelText}>Cancel</Text>
               </TouchableOpacity>
