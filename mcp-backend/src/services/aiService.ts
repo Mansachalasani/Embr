@@ -511,7 +511,10 @@ export class AIService {
         if (personal?.hobbies && personal.hobbies.length > 0) {
           prompt += `- Hobbies: ${personal.hobbies.join(', ')}\n`;
         }
-        
+        if (personal?.religion && personal.religion !== 'prefer_not_to_say') {
+          prompt += `- Faith/Worldview: ${personal.religion}\n`;
+        }
+
         // Communication Style
         const commStyle = completeContext.profile.communicationStyle;
         if (commStyle) {
