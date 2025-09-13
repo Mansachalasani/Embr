@@ -978,20 +978,29 @@ useEffect(() => {
       // Add user message to UI
       const userMessage = ChatService.createMessage('user', userText, { isVoice: true });
       const aiMessage = ChatService.createMessage('assistant', aiText, { isVoice: true });
-      
+
       const updatedMessages = [...messages, userMessage, aiMessage];
       setMessages(updatedMessages);
-      
+
       // Update cache
       messageCache.current.set(currentSession.id, updatedMessages);
-      
+
+      // Save messages to session storage
+      try {
+        await SessionService.addMessage(currentSession.id, 'user', userText, { isVoice: true });
+        await SessionService.addMessage(currentSession.id, 'assistant', aiText, { isVoice: true });
+        console.log('✅ Voice messages saved to session storage');
+      } catch (sessionError) {
+        console.error('❌ Error saving voice messages to session:', sessionError);
+      }
+
       // Auto-scroll to latest message
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
 
       console.log('🎤 Voice message added:', { userText: userText.substring(0, 50), aiText: aiText.substring(0, 50) });
-      
+
     } catch (error) {
       console.error('❌ Error handling voice message:', error);
     }
