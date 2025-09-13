@@ -26,6 +26,8 @@ import { ThinkingAnimation } from '../../components/ThinkingAnimation';
 import { StreamingMessage } from '../../components/StreamingMessage';
 import { StreamingCallbacks } from '../../services/streamingService';
 import { VoiceChat } from '../../components/VoiceChat';
+import { RealtimeVoiceChat } from '../../components/RealtimeVoiceChat';
+import { realtimeVoiceService } from '../../services/realtimeVoiceService';
 import { FileOperationCard } from '../../components/FileOperationCard';
 import { DocumentAnalysisCard } from '../../components/DocumentAnalysisCard';
 import { DriveFileCard } from '../../components/DriveFileCard';
@@ -350,11 +352,28 @@ export default function Chat() {
       shadowRadius: 16,
       elevation: 16,
     },
+    voiceModalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      width: '100%',
+      marginBottom: 8,
+    },
     voiceModalTitle: {
       fontSize: 20,
       fontWeight: '700',
       color: colors.text,
-      marginBottom: 8,
+      flex: 1,
+      textAlign: 'center',
+    },
+    voiceSelectionButton: {
+      position: 'absolute',
+      right: 0,
+      padding: 8,
+      borderRadius: 20,
+      backgroundColor: colors.surfaceVariant,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     voiceModalSubtitle: {
       fontSize: 16,
@@ -442,6 +461,67 @@ export default function Chat() {
       borderColor: 'rgba(255, 215, 0, 0.6)', // Gold
       backgroundColor: 'rgba(255, 215, 0, 0.12)',
     },
+
+    // Voice selection modal styles
+    voiceSelectionModal: {
+      margin: 20,
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      padding: 20,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+      elevation: 5,
+      maxHeight: '80%',
+    },
+    voiceSelectionTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginBottom: 16,
+      textAlign: 'center',
+    },
+    voiceItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    selectedVoiceItem: {
+      backgroundColor: colors.primary + '20',
+      borderColor: colors.primary,
+    },
+    voiceInfo: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    voiceName: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    voiceLanguage: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    voiceSelectionClose: {
+      marginTop: 16,
+      padding: 12,
+      backgroundColor: colors.surfaceVariant,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    voiceSelectionCloseText: {
+      fontSize: 16,
+      color: colors.text,
+      fontWeight: '600',
+    },
   });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -462,6 +542,10 @@ export default function Chat() {
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [showVoicePopup, setShowVoicePopup] = useState(false);
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [forceStopVoice, setForceStopVoice] = useState(false);
+  const [showVoiceSelection, setShowVoiceSelection] = useState(false);
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState<string>('');
   const flatListRef = useRef<FlatList>(null);
   const [autoRecord, setautoRecord] = useState(false)
   const messageCache = useRef<Map<string, ChatMessage[]>>(new Map());
@@ -572,6 +656,34 @@ useEffect(() => {
       fireWave4.setValue(0);
     }
   }, [isRecordingVoice]);
+
+  // Load available voices on component mount
+  useEffect(() => {
+    const loadVoices = () => {
+      const voices = realtimeVoiceService.getAvailableVoices();
+      setAvailableVoices(voices);
+
+      // Set current voice if available
+      const currentVoice = realtimeVoiceService.getCurrentVoice();
+      if (currentVoice) {
+        setSelectedVoice(currentVoice);
+      } else if (voices.length > 0) {
+        setSelectedVoice(voices[0].name);
+      }
+    };
+
+    // Load voices immediately
+    loadVoices();
+
+    // Also listen for voices changed event (for web browsers)
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
+
+      return () => {
+        window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
+      };
+    }
+  }, []);
 
   const initializeAppMode = async () => {
     try {
@@ -977,20 +1089,29 @@ useEffect(() => {
       // Add user message to UI
       const userMessage = ChatService.createMessage('user', userText, { isVoice: true });
       const aiMessage = ChatService.createMessage('assistant', aiText, { isVoice: true });
-      
+
       const updatedMessages = [...messages, userMessage, aiMessage];
       setMessages(updatedMessages);
-      
+
       // Update cache
       messageCache.current.set(currentSession.id, updatedMessages);
-      
+
+      // Save messages to session storage
+      try {
+        await SessionService.addMessage(currentSession.id, 'user', userText, { isVoice: true });
+        await SessionService.addMessage(currentSession.id, 'assistant', aiText, { isVoice: true });
+        console.log('✅ Voice messages saved to session storage');
+      } catch (sessionError) {
+        console.error('❌ Error saving voice messages to session:', sessionError);
+      }
+
       // Auto-scroll to latest message
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
 
       console.log('🎤 Voice message added:', { userText: userText.substring(0, 50), aiText: aiText.substring(0, 50) });
-      
+
     } catch (error) {
       console.error('❌ Error handling voice message:', error);
     }
@@ -1003,6 +1124,18 @@ useEffect(() => {
     } else {
       console.log('🔇 Voice mode disabled');
     }
+  };
+
+  const handleCloseVoiceModal = () => {
+    console.log('🔒 Closing voice modal and stopping conversation');
+    setForceStopVoice(true);
+    setShowVoicePopup(false);
+    setIsRecordingVoice(false);
+
+    // Reset force stop after a brief delay
+    setTimeout(() => {
+      setForceStopVoice(false);
+    }, 500);
   };
 
   const startContinuousVoiceMode = async () => {
@@ -1054,6 +1187,15 @@ useEffect(() => {
       console.error('❌ Error starting push-to-talk recording:', error);
       setIsRecordingVoice(false);
     }
+  };
+
+  const handleVoiceSelection = (voiceName: string) => {
+    const success = realtimeVoiceService.setVoice(voiceName);
+    if (success) {
+      setSelectedVoice(voiceName);
+      console.log('🎤 Voice changed to:', voiceName);
+    }
+    setShowVoiceSelection(false);
   };
 
   const stopPushToTalkRecording = async () => {
@@ -1269,13 +1411,11 @@ useEffect(() => {
             </View>
           )}
 
-          <Text style={[
+          {renderFormattedText(item.content, [
             styles.messageText,
             isUser ? styles.userText : styles.assistantText,
             item.metadata?.error && styles.errorText
-          ]}>
-            {item.content}
-          </Text>
+          ])}
 
           {/* Voice message indicator */}
           {item.metadata?.isVoice && (
@@ -1304,6 +1444,114 @@ useEffect(() => {
   };
 
   const suggestedCommands = ['/connect', '/status', '/help', '/calendar', '/emails'];
+
+  // Function to render text with basic markdown formatting
+  const renderFormattedText = (content: string, baseStyle: any[]) => {
+    // Process line by line for better structure
+    const lines = content.split('\n');
+
+    return (
+      <View>
+        {lines.map((line, lineIndex) => {
+          // Handle headers (# ## ###)
+          const headerMatch = line.match(/^(#{1,3})\s+(.+)$/);
+          if (headerMatch) {
+            const level = headerMatch[1].length;
+            const headerText = headerMatch[2];
+            return (
+              <Text key={lineIndex} style={[
+                ...baseStyle,
+                {
+                  fontWeight: 'bold',
+                  fontSize: level === 1 ? 20 : level === 2 ? 18 : 16,
+                  marginTop: lineIndex > 0 ? 8 : 0,
+                  marginBottom: 4
+                }
+              ]}>
+                {renderInlineFormatting(headerText, baseStyle)}
+              </Text>
+            );
+          }
+
+          // Handle bullet points (- or *)
+          const bulletMatch = line.match(/^[-*]\s+(.+)$/);
+          if (bulletMatch) {
+            const bulletText = bulletMatch[1];
+            return (
+              <Text key={lineIndex} style={baseStyle}>
+                • {renderInlineFormatting(bulletText, baseStyle)}
+              </Text>
+            );
+          }
+
+          // Handle numbered lists (1. 2. etc)
+          const numberedMatch = line.match(/^(\d+)\.\s+(.+)$/);
+          if (numberedMatch) {
+            const number = numberedMatch[1];
+            const listText = numberedMatch[2];
+            return (
+              <Text key={lineIndex} style={baseStyle}>
+                {number}. {renderInlineFormatting(listText, baseStyle)}
+              </Text>
+            );
+          }
+
+          // Regular line
+          return (
+            <Text key={lineIndex} style={baseStyle}>
+              {renderInlineFormatting(line, baseStyle)}
+            </Text>
+          );
+        })}
+      </View>
+    );
+  };
+
+  // Helper function to render inline formatting (bold, italic, code)
+  const renderInlineFormatting = (text: string, baseStyle: any[]) => {
+    // Split text by markdown patterns while preserving the markers
+    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
+
+    return parts.map((part, index) => {
+      // Handle bold text **text**
+      if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+        const boldText = part.slice(2, -2);
+        return (
+          <Text key={index} style={{ fontWeight: 'bold' }}>
+            {boldText}
+          </Text>
+        );
+      }
+      // Handle italic text *text*
+      else if (part.startsWith('*') && part.endsWith('*') && part.length > 2 && !part.startsWith('**')) {
+        const italicText = part.slice(1, -1);
+        return (
+          <Text key={index} style={{ fontStyle: 'italic' }}>
+            {italicText}
+          </Text>
+        );
+      }
+      // Handle inline code `text`
+      else if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+        const codeText = part.slice(1, -1);
+        return (
+          <Text key={index} style={{
+            fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+            backgroundColor: colors.surfaceVariant,
+            paddingHorizontal: 4,
+            paddingVertical: 2,
+            borderRadius: 4
+          }}>
+            {codeText}
+          </Text>
+        );
+      }
+      // Regular text
+      else {
+        return part;
+      }
+    });
+  };
 
   if (isSessionLoading) {
     return (
@@ -1463,121 +1711,98 @@ useEffect(() => {
           visible={showVoicePopup}
           animationType="slide"
           transparent={true}
-          onRequestClose={() => {
-            setShowVoicePopup(false);
-            setIsRecordingVoice(false);
-          }}
+          onRequestClose={handleCloseVoiceModal}
         >
           <View style={styles.voiceModalOverlay}>
             <TouchableOpacity
               style={styles.voiceModalBackdrop}
-              onPress={() => {
-                setShowVoicePopup(false);
-                setIsRecordingVoice(false);
-              }}
+              onPress={handleCloseVoiceModal}
             />
             <View style={styles.voiceModalContainer}>
-              <Text style={styles.voiceModalTitle}>Voice Message</Text>
-              <Text style={styles.voiceModalSubtitle}>
-                {isRecordingVoice ? 'Release to send' : 'Hold to record'}
-              </Text>
-              
+              {/* Modal Header with Voice Selection Button */}
+              <View style={styles.voiceModalHeader}>
+                <Text style={styles.voiceModalTitle}>Voice Chat</Text>
+                <TouchableOpacity
+                  style={styles.voiceSelectionButton}
+                  onPress={() => setShowVoiceSelection(true)}
+                >
+                  <Ionicons name="person-outline" size={20} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
+
               {/* Big Push-to-Talk Button with Fire Wave Effects */}
               <View style={styles.voiceButtonContainer}>
                 {/* Fire Wave Effects */}
-                {isRecordingVoice && (
-                  <>
-                    {/* Outer fire wave */}
-                    <Animated.View style={[
-                      styles.fireWave,
-                      styles.fireWave1,
-                      {
-                        opacity: fireWave1.interpolate({
-                          inputRange: [0, 0.5, 1],
-                          outputRange: [0.1, 0.6, 0.1],
-                        }),
-                        transform: [{
-                          scale: fireWave1.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [1, 2.8],
-                          }),
-                        }],
-                      }
-                    ]} />
-                    
-                    {/* Second fire wave */}
-                    <Animated.View style={[
-                      styles.fireWave,
-                      styles.fireWave2,
-                      {
-                        opacity: fireWave2.interpolate({
-                          inputRange: [0, 0.5, 1],
-                          outputRange: [0.15, 0.7, 0.15],
-                        }),
-                        transform: [{
-                          scale: fireWave2.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [1, 2.4],
-                          }),
-                        }],
-                      }
-                    ]} />
-                    
-                    {/* Third fire wave */}
-                    <Animated.View style={[
-                      styles.fireWave,
-                      styles.fireWave3,
-                      {
-                        opacity: fireWave3.interpolate({
-                          inputRange: [0, 0.5, 1],
-                          outputRange: [0.2, 0.8, 0.2],
-                        }),
-                        transform: [{
-                          scale: fireWave3.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [1, 2.0],
-                          }),
-                        }],
-                      }
-                    ]} />
-                    
-                    {/* Inner fire wave */}
-                    <Animated.View style={[
-                      styles.fireWave,
-                      styles.fireWave4,
-                      {
-                        opacity: fireWave4.interpolate({
-                          inputRange: [0, 0.5, 1],
-                          outputRange: [0.3, 0.9, 0.3],
-                        }),
-                        transform: [{
-                          scale: fireWave4.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [1, 1.6],
-                          }),
-                        }],
-                      }
-                    ]} />
-                  </>
-                )}
-              <View style={{marginTop:50}}>
+            
+              <View style={{marginTop:10}}>
 
-                <VoiceChat
+                <RealtimeVoiceChat
                   sessionId={currentSession?.id}
                   onVoiceMessage={handleVoiceMessage}
                   onRecordingStateChange={setIsRecordingVoice}
                   disabled={isLoading}
                   autoRecording={autoRecord}
-                 
+                  naturalConversation={autoRecord}
+                  forceStop={forceStopVoice}
                 />
               </View>
               </View>
               
               <TouchableOpacity
                 style={styles.voiceModalCancelButton}
-                onPress={() => setShowVoicePopup(false)}
+                onPress={handleCloseVoiceModal}
               >
                 <Text style={styles.voiceModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Voice Selection Modal */}
+        <Modal
+          visible={showVoiceSelection}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={() => setShowVoiceSelection(false)}
+        >
+          <View style={styles.voiceModalOverlay}>
+            <View style={styles.voiceSelectionModal}>
+              <Text style={styles.voiceSelectionTitle}>Select Voice</Text>
+
+              <FlatList
+                data={availableVoices}
+                keyExtractor={(item) => item.name}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[
+                      styles.voiceItem,
+                      selectedVoice === item.name && styles.selectedVoiceItem
+                    ]}
+                    onPress={() => handleVoiceSelection(item.name)}
+                  >
+                    <Ionicons
+                      name={selectedVoice === item.name ? "checkmark-circle" : "person-outline"}
+                      size={24}
+                      color={selectedVoice === item.name ? colors.primary : colors.textSecondary}
+                    />
+                    <View style={styles.voiceInfo}>
+                      <Text style={styles.voiceName}>{item.name}</Text>
+                      <Text style={styles.voiceLanguage}>
+                        {item.lang} • {item.localService ? 'Local' : 'Remote'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+                showsVerticalScrollIndicator={false}
+                maxToRenderPerBatch={10}
+                windowSize={10}
+              />
+
+              <TouchableOpacity
+                style={styles.voiceSelectionClose}
+                onPress={() => setShowVoiceSelection(false)}
+              >
+                <Text style={styles.voiceSelectionCloseText}>Close</Text>
               </TouchableOpacity>
             </View>
           </View>

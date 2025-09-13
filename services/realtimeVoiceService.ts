@@ -1,5 +1,4 @@
 import { Platform } from 'react-native';
-import { OpenAIService, OpenAIMessage } from './openAIService';
 import { ChatService } from './chatService';
 
 // Import platform-specific voice libraries
@@ -35,7 +34,7 @@ export interface ConversationCallbacks {
   onSpeechEnd?: () => void;
   onError?: (error: any) => void;
   onAIThinking?: () => void;
-  onAIResponse?: (text: string) => void;
+  onAIResponse?: (aiText: string, userText: string) => void;
   onAISpeaking?: () => void;
   onConversationEnd?: () => void;
 }
@@ -59,7 +58,6 @@ class RealtimeVoiceService {
   private userHasInteracted = false;
   private selectedVoice: SpeechSynthesisVoice | null = null;
   private availableVoices: SpeechSynthesisVoice[] = [];
-  private conversationHistory: OpenAIMessage[] = [];
 
   constructor() {
     this.initializeAPIs();
@@ -220,14 +218,9 @@ class RealtimeVoiceService {
         console.log('✅ TTS finished');
         this.isSpeaking = false;
 
-        // Auto-restart listening after TTS finishes for truly conversational experience
+        // Restart listening after TTS finishes
         if (this.conversationActive && !this.isProcessing) {
-          setTimeout(() => {
-            if (this.conversationActive && !this.isListening && !this.isProcessing) {
-              console.log('🔄 Auto-restarting listening after mobile TTS...');
-              this.restartListening();
-            }
-          }, 1000);
+          setTimeout(() => this.restartListening(), 1000);
         }
       });
 
@@ -251,12 +244,24 @@ class RealtimeVoiceService {
       if (voices.length > 0) {
         this.availableVoices = voices.filter(voice => voice.lang.startsWith('en'));
 
-        // Select default voice (prefer Google or higher quality voices)
-        const preferredVoice = this.availableVoices.find(voice =>
-          voice.name.toLowerCase().includes('google') ||
-          voice.name.toLowerCase().includes('microsoft') ||
-          voice.name.toLowerCase().includes('alex') ||
-          voice.name.toLowerCase().includes('samantha')
+        // Select default voice with better priority for natural, assistant-like voices
+        const preferredVoice = this.availableVoices.find(voice => {
+          const name = voice.name.toLowerCase();
+          // Priority 1: High-quality neural/premium voices
+          if (name.includes('neural') || name.includes('premium') || name.includes('enhanced')) return true;
+          // Priority 2: Female voices that sound assistant-like
+          if (name.includes('zira') || name.includes('eva') || name.includes('samantha')) return true;
+          if (name.includes('siri') || name.includes('female')) return true;
+          // Priority 3: Google voices (usually high quality)
+          if (name.includes('google')) return true;
+          // Priority 4: Other known good voices
+          if (name.includes('microsoft') || name.includes('alex')) return true;
+          return false;
+        }) ||
+        // Fallback: prefer female voices in general (tend to sound more assistant-like)
+        this.availableVoices.find(voice =>
+          voice.name.toLowerCase().includes('female') ||
+          !voice.name.toLowerCase().includes('male')
         );
 
         this.selectedVoice = preferredVoice || this.availableVoices[0] || null;
@@ -325,56 +330,25 @@ class RealtimeVoiceService {
       // Indicate AI is thinking
       this.callbacks.onAIThinking?.();
 
-      // Add user message to conversation history
-      this.conversationHistory.push({ role: 'user', content: text });
+      // Process the message with AI
+      console.log('🤔 Sending to AI:', text);
+      const responses = await ChatService.processMessage(text, this.sessionId);
 
-      // Process with OpenAI if configured, otherwise fall back to ChatService
-      let aiResponse: string;
+      if (responses.length > 0) {
+        const aiResponse = responses[responses.length - 1];
+        console.log('💬 AI response received:', aiResponse.content.substring(0, 50));
 
-      if (OpenAIService.isConfigured()) {
-        console.log('🤖 Using OpenAI for voice response...');
-        const response = await OpenAIService.voiceChat(text, this.conversationHistory.slice(-10)); // Keep last 10 messages for context
+        this.callbacks.onAIResponse?.(aiResponse.content, text);
 
-        if (response.success && response.content) {
-          aiResponse = response.content;
-
-          // Add AI response to conversation history
-          this.conversationHistory.push({ role: 'assistant', content: aiResponse });
-
-          // Trim history to prevent it from getting too long
-          if (this.conversationHistory.length > 20) {
-            this.conversationHistory = this.conversationHistory.slice(-20);
-          }
-
-          console.log('💬 OpenAI voice response:', aiResponse.substring(0, 50));
-        } else {
-          throw new Error(response.error || 'OpenAI request failed');
-        }
+        // Speak the AI response
+        await this.speak(aiResponse.content);
       } else {
-        console.log('🔄 Falling back to ChatService...');
-        const responses = await ChatService.processMessage(text, this.sessionId);
-
-        if (responses.length > 0) {
-          const assistantResponse = responses.find(r => r.type === 'assistant');
-          aiResponse = assistantResponse?.content || 'I received your message but couldn\'t generate a response.';
-        } else {
-          throw new Error('No response from chat service');
-        }
+        console.warn('⚠️ No AI response received');
+        throw new Error('No response from AI');
       }
-
-      this.callbacks.onAIResponse?.(aiResponse);
-
-      // Speak the AI response
-      await this.speak(aiResponse);
-
     } catch (error) {
       console.error('❌ Error processing voice message:', error);
       this.callbacks.onError?.(error instanceof Error ? error.message : 'Processing failed');
-
-      // Continue conversation even after error
-      if (this.conversationActive && !this.isSpeaking) {
-        setTimeout(() => this.restartListening(), 2000);
-      }
     } finally {
       this.isProcessing = false;
     }
@@ -391,6 +365,42 @@ class RealtimeVoiceService {
     } catch (error) {
       console.error('❌ Error restarting listening:', error);
     }
+  }
+
+  private preprocessTextForSpeech(text: string): string {
+    return text
+      // Remove markdown formatting that sounds weird when spoken
+      .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold
+      .replace(/\*(.*?)\*/g, '$1') // Remove italic
+      .replace(/`(.*?)`/g, '$1') // Remove code backticks
+      .replace(/#{1,6}\s*/g, '') // Remove markdown headers
+
+      // Replace common symbols with spoken equivalents
+      .replace(/&/g, ' and ')
+      .replace(/@/g, ' at ')
+      .replace(/#/g, ' hashtag ')
+      .replace(/\$/g, ' dollars ')
+      .replace(/%/g, ' percent ')
+      .replace(/\+/g, ' plus ')
+      .replace(/=/g, ' equals ')
+
+      // Improve pronunciation of common terms
+      .replace(/\bAPI\b/g, 'A P I')
+      .replace(/\bURL\b/g, 'U R L')
+      .replace(/\bHTML\b/g, 'H T M L')
+      .replace(/\bCSS\b/g, 'C S S')
+      .replace(/\bJS\b/g, 'JavaScript')
+      .replace(/\bUI\b/g, 'user interface')
+      .replace(/\bUX\b/g, 'user experience')
+
+      // Add natural pauses
+      .replace(/\.\s+/g, '. ') // Ensure pause after periods
+      .replace(/,\s+/g, ', ') // Ensure pause after commas
+      .replace(/:\s+/g, ': ') // Ensure pause after colons
+
+      // Remove excessive whitespace
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   async startListening(): Promise<void> {
@@ -457,8 +467,11 @@ class RealtimeVoiceService {
       return;
     }
 
+    // Preprocess text for better speech synthesis
+    const processedText = this.preprocessTextForSpeech(text);
+
     try {
-      console.log('🔊 Speaking:', text.substring(0, 50));
+      console.log('🔊 Speaking:', processedText.substring(0, 50));
 
       if (Platform.OS === 'web' && this.webSynthesis) {
         // Check if user has interacted and TTS is available
@@ -468,24 +481,16 @@ class RealtimeVoiceService {
           this.callbacks.onAISpeaking?.();
           setTimeout(() => {
             this.isSpeaking = false;
-            // Auto-restart listening after simulated TTS
-            if (this.conversationActive && !this.isProcessing) {
-              setTimeout(() => {
-                if (this.conversationActive && !this.isListening && !this.isProcessing) {
-                  console.log('🔄 Auto-restarting listening after simulated TTS...');
-                  this.restartListening();
-                }
-              }, 800);
-            }
           }, 1000); // Simulate speech time
           return;
         }
 
         return new Promise((resolve, reject) => {
-          const utterance = new SpeechSynthesisUtterance(text);
-          utterance.rate = options.rate || 0.9;
-          utterance.pitch = options.pitch || 1;
-          utterance.volume = options.volume || 0.8;
+          const utterance = new SpeechSynthesisUtterance(processedText);
+          // Optimized speech parameters for more natural, assistant-like voice
+          utterance.rate = options.rate || 0.85; // Slightly slower for clearer speech
+          utterance.pitch = options.pitch || 0.95; // Slightly lower pitch for warmer tone
+          utterance.volume = options.volume || 0.9; // Higher volume for clarity
           utterance.lang = options.language || 'en-US';
 
           // Use selected voice if available
@@ -499,21 +504,24 @@ class RealtimeVoiceService {
             console.log('🔊 Web TTS started');
             hasStarted = true;
             this.isSpeaking = true;
+            this.isProcessing = false;
             this.callbacks.onAISpeaking?.();
           };
 
           utterance.onend = () => {
             console.log('✅ Web TTS finished');
+            this.isProcessing = false;
             this.isSpeaking = false;
 
             // Auto-restart listening after a brief pause for truly conversational experience
+            console.log(this.conversationActive, this.isProcessing,'kkkkkkk');
             if (this.conversationActive && !this.isProcessing) {
-              setTimeout(() => {
+              console.log(this.conversationActive && !this.isListening && !this.isProcessing,',mmmmmmm')
                 if (this.conversationActive && !this.isListening && !this.isProcessing) {
-                  console.log('🔄 Auto-restarting listening after web TTS...');
+                  console.log('🔄 Auto-restarting listening after TTS...');
                   this.restartListening();
                 }
-              }, 800); // Brief pause for natural conversation flow
+             
             }
 
             resolve();
@@ -526,6 +534,7 @@ class RealtimeVoiceService {
             // Handle specific TTS errors
             if (error.error === 'not-allowed') {
               console.warn('🚫 TTS not allowed. Continuing without speech.');
+              // Don't reject, just resolve to continue conversation
               resolve();
             } else if (error.error === 'network') {
               console.warn('🌐 TTS network error. Continuing without speech.');
@@ -567,33 +576,26 @@ class RealtimeVoiceService {
         this.isSpeaking = true;
         this.callbacks.onAISpeaking?.();
 
-        await Tts.speak(text, {
+        await Tts.speak(processedText, {
           androidParams: {
-            KEY_PARAM_PAN: -1,
-            KEY_PARAM_VOLUME: options.volume || 0.8,
+            KEY_PARAM_PAN: 0, // Center audio
+            KEY_PARAM_VOLUME: options.volume || 0.9,
             KEY_PARAM_STREAM: 'STREAM_MUSIC',
           },
-          iosVoiceId: 'com.apple.ttsbundle.Moira-compact',
-          rate: options.rate || 0.5,
-          pitch: options.pitch || 1.0,
+          // Use higher quality iOS voices - prefer natural female voices
+          iosVoiceId: options.language?.includes('UK') ?
+            'com.apple.ttsbundle.Kate-compact' :
+            'com.apple.ttsbundle.Samantha-compact', // Samantha is more natural than Moira
+          rate: options.rate || 0.6, // Slightly slower for mobile clarity
+          pitch: options.pitch || 0.95, // Slightly lower pitch for warmer tone
         });
       } else {
         // No TTS available, just simulate speaking
         console.warn('⚠️ No TTS available. Continuing conversation without speech.');
         this.callbacks.onAISpeaking?.();
-        const simulatedDuration = Math.min(text.length * 50, 3000); // Simulate reading time
         setTimeout(() => {
           this.isSpeaking = false;
-          // Auto-restart listening after simulated speech
-          if (this.conversationActive && !this.isProcessing) {
-            setTimeout(() => {
-              if (this.conversationActive && !this.isListening && !this.isProcessing) {
-                console.log('🔄 Auto-restarting listening after simulated speech...');
-                this.restartListening();
-              }
-            }, 800);
-          }
-        }, simulatedDuration);
+        }, Math.min(processedText.length * 50, 3000)); // Simulate reading time
       }
     } catch (error) {
       console.error('❌ Error speaking text:', error);
@@ -639,7 +641,6 @@ class RealtimeVoiceService {
     this.callbacks = callbacks;
     this.conversationActive = true;
     this.isProcessing = false;
-    this.conversationHistory = []; // Reset conversation history
 
     console.log('🗣️ Starting real-time conversation mode');
 
@@ -692,9 +693,6 @@ class RealtimeVoiceService {
       clearTimeout(this.speechTimeout);
       this.speechTimeout = null;
     }
-
-    // Clear conversation history
-    this.conversationHistory = [];
 
     this.callbacks.onConversationEnd?.();
     this.callbacks = {};
