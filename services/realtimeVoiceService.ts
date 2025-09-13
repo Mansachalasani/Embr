@@ -34,7 +34,7 @@ export interface ConversationCallbacks {
   onSpeechEnd?: () => void;
   onError?: (error: any) => void;
   onAIThinking?: () => void;
-  onAIResponse?: (text: string) => void;
+  onAIResponse?: (aiText: string, userText: string) => void;
   onAISpeaking?: () => void;
   onConversationEnd?: () => void;
 }
@@ -326,7 +326,7 @@ class RealtimeVoiceService {
         const aiResponse = responses[responses.length - 1];
         console.log('💬 AI response received:', aiResponse.content.substring(0, 50));
 
-        this.callbacks.onAIResponse?.(aiResponse.content);
+        this.callbacks.onAIResponse?.(aiResponse.content, text);
 
         // Speak the AI response
         await this.speak(aiResponse.content);

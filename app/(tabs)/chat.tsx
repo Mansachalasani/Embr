@@ -1478,90 +1478,13 @@ useEffect(() => {
               }}
             />
             <View style={styles.voiceModalContainer}>
-              <Text style={styles.voiceModalTitle}>Voice Message</Text>
-              <Text style={styles.voiceModalSubtitle}>
-                {isRecordingVoice ? 'Release to send' : 'Hold to record'}
-              </Text>
+             
               
               {/* Big Push-to-Talk Button with Fire Wave Effects */}
               <View style={styles.voiceButtonContainer}>
                 {/* Fire Wave Effects */}
-                {isRecordingVoice && (
-                  <>
-                    {/* Outer fire wave */}
-                    <Animated.View style={[
-                      styles.fireWave,
-                      styles.fireWave1,
-                      {
-                        opacity: fireWave1.interpolate({
-                          inputRange: [0, 0.5, 1],
-                          outputRange: [0.1, 0.6, 0.1],
-                        }),
-                        transform: [{
-                          scale: fireWave1.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [1, 2.8],
-                          }),
-                        }],
-                      }
-                    ]} />
-                    
-                    {/* Second fire wave */}
-                    <Animated.View style={[
-                      styles.fireWave,
-                      styles.fireWave2,
-                      {
-                        opacity: fireWave2.interpolate({
-                          inputRange: [0, 0.5, 1],
-                          outputRange: [0.15, 0.7, 0.15],
-                        }),
-                        transform: [{
-                          scale: fireWave2.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [1, 2.4],
-                          }),
-                        }],
-                      }
-                    ]} />
-                    
-                    {/* Third fire wave */}
-                    <Animated.View style={[
-                      styles.fireWave,
-                      styles.fireWave3,
-                      {
-                        opacity: fireWave3.interpolate({
-                          inputRange: [0, 0.5, 1],
-                          outputRange: [0.2, 0.8, 0.2],
-                        }),
-                        transform: [{
-                          scale: fireWave3.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [1, 2.0],
-                          }),
-                        }],
-                      }
-                    ]} />
-                    
-                    {/* Inner fire wave */}
-                    <Animated.View style={[
-                      styles.fireWave,
-                      styles.fireWave4,
-                      {
-                        opacity: fireWave4.interpolate({
-                          inputRange: [0, 0.5, 1],
-                          outputRange: [0.3, 0.9, 0.3],
-                        }),
-                        transform: [{
-                          scale: fireWave4.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [1, 1.6],
-                          }),
-                        }],
-                      }
-                    ]} />
-                  </>
-                )}
-              <View style={{marginTop:50}}>
+            
+              <View style={{marginTop:10}}>
 
                 <RealtimeVoiceChat
                   sessionId={currentSession?.id}

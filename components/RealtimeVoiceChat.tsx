@@ -53,6 +53,7 @@ export function RealtimeVoiceChat({
   const [isSupported, setIsSupported] = useState<boolean | null>(null);
   const [conversationActive, setConversationActive] = useState(false);
   const [lastUserMessage, setLastUserMessage] = useState('');
+  const [currentUserMessage, setCurrentUserMessage] = useState('');
   const [lastAIMessage, setLastAIMessage] = useState('');
   const [hasPermission, setHasPermission] = useState(false);
   const [statusMessage, setStatusMessage] = useState('Initializing...');
@@ -512,6 +513,7 @@ export function RealtimeVoiceChat({
     try {
       console.log('🚀 Starting conversation...');
       setStatusMessage('Starting conversation...');
+      setCurrentUserMessage(''); // Reset for new conversation
 
       const callbacks: ConversationCallbacks = {
         onListening: () => {
@@ -525,7 +527,10 @@ export function RealtimeVoiceChat({
         onResults: (results) => {
           console.log('📝 Speech results callback:', results);
           if (results.length > 0) {
-            setLastUserMessage(results[0]);
+            const transcribedText = results[0];
+            console.log('🎯 Setting current user message:', transcribedText);
+            setCurrentUserMessage(transcribedText);
+            setLastUserMessage(transcribedText);
           }
         },
 
@@ -547,14 +552,16 @@ export function RealtimeVoiceChat({
           setStatusMessage('AI is processing your request...');
         },
 
-        onAIResponse: (text) => {
-          console.log('💬 AI response callback:', text.substring(0, 50));
-          setLastAIMessage(text);
+        onAIResponse: (aiText, userText) => {
+          console.log('💬 AI response callback:', aiText.substring(0, 50));
+          console.log('🎯 User text from service:', userText);
+          setLastAIMessage(aiText);
           setIsThinking(false);
           setStatusMessage('AI responding...');
 
-          // Notify parent component with voice message
-          onVoiceMessage?.(lastUserMessage || 'Voice input', text, new ArrayBuffer(0));
+          // Notify parent component with voice message - use the userText from the service
+          console.log('📤 Calling onVoiceMessage with:', { userText, aiText: aiText.substring(0, 50) });
+          onVoiceMessage?.(userText || 'Voice input', aiText, new ArrayBuffer(0));
         },
 
         onAISpeaking: () => {
@@ -580,6 +587,7 @@ export function RealtimeVoiceChat({
           setIsListening(false);
           setIsThinking(false);
           setIsSpeaking(false);
+          setCurrentUserMessage('');
           setStatusMessage('Conversation ended');
         },
       };
@@ -607,6 +615,7 @@ export function RealtimeVoiceChat({
       setIsListening(false);
       setIsThinking(false);
       setIsSpeaking(false);
+      setCurrentUserMessage('');
       setStatusMessage('Conversation stopped');
     } catch (error) {
       console.error('❌ Error stopping conversation:', error);
@@ -819,16 +828,7 @@ export function RealtimeVoiceChat({
           </Text>
         </TouchableOpacity>
 
-        {Platform.OS === 'web' && availableVoices.length > 0 && (
-          <TouchableOpacity
-            style={styles.voiceButton2}
-            onPress={() => setShowVoiceSelector(true)}
-          >
-            <Text style={styles.voiceButtonText}>
-              🎤 Voice
-            </Text>
-          </TouchableOpacity>
-        )}
+       
       </View>
 
       {/* Voice Selector Modal */}
@@ -889,11 +889,11 @@ export function RealtimeVoiceChat({
       </Modal>
 
       {/* Debug info for development */}
-      {__DEV__ && (
+      {/* {__DEV__ && (
         <Text style={[styles.statusText, { fontSize: 10, color: colors.textSecondary, marginTop: 12 }]}>
           Debug: {JSON.stringify({ conversationActive, isListening, isThinking, isSpeaking })}
         </Text>
-      )}
+      )} */}
     </View>
   );
 }
