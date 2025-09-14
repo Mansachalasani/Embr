@@ -244,18 +244,41 @@ class RealtimeVoiceService {
       if (voices.length > 0) {
         this.availableVoices = voices.filter(voice => voice.lang.startsWith('en'));
 
-        // Select default voice with better priority for natural, assistant-like voices
+        // Select default voice with priority for Google UK English female voices
         const preferredVoice = this.availableVoices.find(voice => {
           const name = voice.name.toLowerCase();
-          // Priority 1: High-quality neural/premium voices
-          if (name.includes('neural') || name.includes('premium') || name.includes('enhanced')) return true;
-          // Priority 2: Female voices that sound assistant-like
-          if (name.includes('zira') || name.includes('eva') || name.includes('samantha')) return true;
-          if (name.includes('siri') || name.includes('female')) return true;
-          // Priority 3: Google voices (usually high quality)
-          if (name.includes('google')) return true;
-          // Priority 4: Other known good voices
-          if (name.includes('microsoft') || name.includes('alex')) return true;
+          const lang = voice.lang.toLowerCase();
+
+          // Priority 1: Google UK English female voices (highest priority)
+          if (name.includes('google') &&
+              (lang.includes('gb') || lang.includes('uk') || lang === 'en-gb') &&
+              (name.includes('female') || !name.includes('male'))) {
+            return true;
+          }
+
+          // Priority 2: Any Google UK English voices
+          if (name.includes('google') && (lang.includes('gb') || lang.includes('uk') || lang === 'en-gb')) {
+            return true;
+          }
+
+          // // Priority 3: Google female voices (any English)
+          // if (name.includes('google') && (name.includes('female') || !name.includes('male'))) {
+          //   return true;
+          // }
+
+          // // Priority 4: Any Google voices
+          // if (name.includes('google')) return true;
+
+          // // Priority 5: High-quality neural/premium voices
+          // if (name.includes('neural') || name.includes('premium') || name.includes('enhanced')) return true;
+
+          // // Priority 6: Female voices that sound assistant-like
+          // if (name.includes('zira') || name.includes('eva') || name.includes('samantha')) return true;
+          // if (name.includes('siri') || name.includes('female')) return true;
+
+          // // Priority 7: Other known good voices
+          // if (name.includes('microsoft') || name.includes('alex')) return true;
+
           return false;
         }) ||
         // Fallback: prefer female voices in general (tend to sound more assistant-like)
@@ -490,8 +513,8 @@ class RealtimeVoiceService {
           const utterance = new SpeechSynthesisUtterance(processedText);
           console.log(options,'ssdd')
           // Optimized speech parameters for more natural, assistant-like voice
-          utterance.rate = options.rate || 1.1; // Slightly slower for clearer speech
-          utterance.pitch = options.pitch || 1.2; // Slightly lower pitch for warmer tone
+          utterance.rate = options.rate || 1.0; // Slightly slower for clearer speech
+          utterance.pitch = options.pitch || 1.1; // Slightly lower pitch for warmer tone
           utterance.volume = options.volume || 0.9; // Higher volume for clarity
           utterance.lang = options.language || 'en-US';
 
