@@ -438,6 +438,7 @@ class RealtimeVoiceService {
     }
   }
 
+
   async stopListening(): Promise<void> {
     if (!this.isListening) return;
 
@@ -487,9 +488,10 @@ class RealtimeVoiceService {
 
         return new Promise((resolve, reject) => {
           const utterance = new SpeechSynthesisUtterance(processedText);
+          console.log(options,'ssdd')
           // Optimized speech parameters for more natural, assistant-like voice
-          utterance.rate = options.rate || 0.85; // Slightly slower for clearer speech
-          utterance.pitch = options.pitch || 0.95; // Slightly lower pitch for warmer tone
+          utterance.rate = options.rate || 1.1; // Slightly slower for clearer speech
+          utterance.pitch = options.pitch || 1.2; // Slightly lower pitch for warmer tone
           utterance.volume = options.volume || 0.9; // Higher volume for clarity
           utterance.lang = options.language || 'en-US';
 
