@@ -28,6 +28,18 @@ export interface AIToolSelection {
   geminiOutput?: string;
 }
 
+export interface DeeplinkAction {
+  type: 'app_open';
+  appName: string;
+  action: string;
+  data?: {
+    searchTerm?: string;
+    phoneNumber?: string;
+    location?: string;
+    destination?: string;
+  };
+}
+
 export interface AIResponse {
   success: boolean;
   toolUsed?: string;
@@ -37,6 +49,7 @@ export interface AIResponse {
   suggestedActions?: string[];
   chainedTools?: string[];
   error?: string;
+  deeplinkAction?: DeeplinkAction;
 }
 
 export interface UserContext {

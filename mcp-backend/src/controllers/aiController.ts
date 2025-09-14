@@ -94,6 +94,7 @@ export class AIController {
           reasoning: result.reasoning,
           suggestedActions: result.suggestedActions,
           rawData: result.rawData, // Include for debugging/advanced users
+          deeplinkAction: result.deeplinkAction, // Include deeplink actions
         },
         error: result.error,
         timestamp: new Date().toISOString(),

@@ -15,6 +15,18 @@ interface AIQueryRequest {
   completeUserContext?: CompleteUserContext;
 }
 
+interface DeeplinkAction {
+  type: 'app_open';
+  appName: string;
+  action: string;
+  data?: {
+    searchTerm?: string;
+    phoneNumber?: string;
+    location?: string;
+    destination?: string;
+  };
+}
+
 interface AIQueryResponse {
   success: boolean;
   data?: {
@@ -24,6 +36,7 @@ interface AIQueryResponse {
     reasoning?: string;
     suggestedActions?: string[];
     rawData?: any;
+    deeplinkAction?: DeeplinkAction;
   };
   error?: string;
   timestamp: string;

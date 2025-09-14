@@ -7,6 +7,7 @@ export interface DeepLinkAction {
   execute: (query: string) => Promise<boolean>;
 }
 
+
 export class DeepLinkingService {
   private static actions: DeepLinkAction[] = [
     // Phone & Contacts
@@ -696,34 +697,35 @@ export class DeepLinkingService {
     // }
   ];
 
+
   /**
-   * Process a natural language query and execute appropriate deep link action
+   * Process a natural language query and execute appropriate deep link action (original keyword-based method)
    */
   static async processDeepLinkQuery(query: string): Promise<{ success: boolean; action?: string; message?: string }> {
     const normalizedQuery = query.toLowerCase().trim();
-    
+
     // Find matching actions
-    const matches = this.actions.filter(action => 
+    const matches = this.actions.filter(action =>
       action.keywords.some(keyword => normalizedQuery.includes(keyword))
     );
-    
+
     if (matches.length === 0) {
       return {
         success: false,
         message: 'No matching app or action found for your request.'
       };
     }
-    
+
     // Try the best match first (most keywords matched)
     const bestMatch = matches.reduce((best, current) => {
       const bestScore = best.keywords.filter(k => normalizedQuery.includes(k)).length;
       const currentScore = current.keywords.filter(k => normalizedQuery.includes(k)).length;
       return currentScore > bestScore ? current : best;
     });
-    
+
     try {
       const success = await bestMatch.execute(query);
-      
+
       if (success) {
         return {
           success: true,
@@ -759,10 +761,11 @@ export class DeepLinkingService {
    */
   static isDeepLinkQuery(query: string): boolean {
     const normalizedQuery = query.toLowerCase().trim();
-    return this.actions.some(action => 
+    return this.actions.some(action =>
       action.keywords.some(keyword => normalizedQuery.includes(keyword))
     );
   }
+
 
   /**
    * Get suggestions for deep link actions

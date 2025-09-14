@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
-import { AIToolMetadata, AIToolSelection, AIResponse, UserContext } from '../types/aiTools';
+import { AIToolMetadata, AIToolSelection, AIResponse, UserContext, DeeplinkAction } from '../types/aiTools';
 import { MCPToolRegistry } from './mcpToolRegistry';
 import { SessionService } from './sessionService';
 import { supabase } from './supabase';
@@ -214,10 +214,10 @@ export class AIService {
    */
   async processQuery(context: UserContext, userId: string): Promise<AIResponse> {
     try {
-      
+
       // Step 0: Enhanced context enrichment with complete user data
       let enrichedContext = context;
-      
+
       // Check if we have complete user context from client
       if (context.completeUserContext) {
         enrichedContext = this.enrichContextWithCompleteUserData(context);
@@ -225,6 +225,21 @@ export class AIService {
         // Fallback to legacy preference fetching
         enrichedContext = await this.enrichContextWithPreferences(context, userId);
       }
+
+      // Step 0.5: Check for deeplink intent FIRST (before tool selection)
+      const deeplinkIntent = await this.detectDeeplinkIntent(enrichedContext.query);
+      if (deeplinkIntent.isDeepLinkIntent && deeplinkIntent.confidence >= 0.7) {
+        return {
+          success: true,
+          naturalResponse: deeplinkIntent.response,
+          toolUsed: 'deeplink',
+          reasoning: deeplinkIntent.reasoning,
+          suggestedActions: [],
+          rawData: null,
+          deeplinkAction: deeplinkIntent.action // New field for frontend
+        };
+      }
+
       // Step 1: Analyze query and select tool
       const toolSelection = await this.selectTool(enrichedContext, userId);
       if (!toolSelection) {
@@ -1064,6 +1079,131 @@ Examples: ${tool.examples.map(e => `"${e.query}"`).join(', ')}
       return {
         complexity: 'moderate',
         reasoning: 'Error in analysis, defaulting to moderate complexity'
+      };
+    }
+  }
+
+  /**
+   * Detect if the user's query intends to open an app or perform a device action
+   */
+  private async detectDeeplinkIntent(query: string): Promise<{
+    isDeepLinkIntent: boolean;
+    confidence: number;
+    reasoning: string;
+    response: string;
+    action?: DeeplinkAction;
+  }> {
+    try {
+      const availableActions = [
+        { name: 'Amazon Search', description: 'Search for products on Amazon', appName: 'amazon' },
+        { name: 'Spotify Play', description: 'Play music on Spotify', appName: 'spotify' },
+        { name: 'YouTube Search', description: 'Search for videos on YouTube', appName: 'youtube' },
+        { name: 'Open Maps', description: 'Navigate to a location using maps', appName: 'maps' },
+        { name: 'Twitter/X', description: 'Open Twitter/X app', appName: 'twitter' },
+        { name: 'WhatsApp', description: 'Open WhatsApp or send messages', appName: 'whatsapp' },
+        { name: 'Book Uber', description: 'Book a ride with Uber', appName: 'uber' },
+      ];
+
+      const systemPrompt = `You are an intent detection system that determines if a user wants to open an app or perform a device action.
+
+Available App Actions:
+${availableActions.map(action => `- ${action.name}: ${action.description}`).join('\n')}
+
+Analyze the user's query and determine:
+1. Is this a request to open an app or perform a device action? (true/false)
+2. Confidence level (0.0 to 1.0) - be strict, only high confidence for clear app actions
+3. Which action matches best (if any)
+4. Extract relevant data (search terms, locations, etc.)
+
+IMPORTANT GUIDELINES:
+- Only return true for CLEAR app action requests (>0.7 confidence)
+- Questions about apps, mentions without intent, or informational queries should be false
+- "I love Spotify" = false (just mentioning, not requesting action)
+- "Play music on Spotify" = true (clear action request)
+- "Tell me about Amazon" = false (informational)
+- "Search for shoes on Amazon" = true (clear action)
+
+Respond ONLY with valid JSON:
+{
+  "isDeepLinkIntent": boolean,
+  "confidence": number,
+  "reasoning": "brief explanation",
+  "response": "natural response message for user",
+  "matchedAction": "action name or null",
+  "extractedData": {
+    "searchTerm": "string or null",
+    "phoneNumber": "string or null",
+    "location": "string or null",
+    "destination": "string or null"
+  }
+}`;
+
+      const response = await this.generateContent(`${systemPrompt}\n\nUser Query: "${query}"`);
+
+      let result;
+      try {
+        result = JSON.parse(response);
+      } catch (parseError) {
+        console.error('❌ Failed to parse deeplink intent response:', parseError);
+        return {
+          isDeepLinkIntent: false,
+          confidence: 0,
+          reasoning: 'Failed to parse AI response',
+          response: 'I can help you with various questions and tasks. What would you like to know?'
+        };
+      }
+
+      // Validate response structure
+      if (typeof result.isDeepLinkIntent !== 'boolean' || typeof result.confidence !== 'number') {
+        return {
+          isDeepLinkIntent: false,
+          confidence: 0,
+          reasoning: 'Invalid AI response format',
+          response: 'I can help you with various questions and tasks. What would you like to know?'
+        };
+      }
+
+      // Create deeplink action if detected
+      let deeplinkAction: DeeplinkAction | undefined;
+      if (result.isDeepLinkIntent && result.matchedAction && result.confidence >= 0.7) {
+        const matchedApp = availableActions.find(action => action.name === result.matchedAction);
+        if (matchedApp) {
+          deeplinkAction = {
+            type: 'app_open',
+            appName: matchedApp.appName,
+            action: result.matchedAction,
+            data: {
+              searchTerm: result.extractedData?.searchTerm || null,
+              phoneNumber: result.extractedData?.phoneNumber || null,
+              location: result.extractedData?.location || null,
+              destination: result.extractedData?.destination || null,
+            }
+          };
+        }
+      }
+
+      console.log('🔗 Deeplink intent detection:', {
+        query: query.substring(0, 50),
+        isDeepLinkIntent: result.isDeepLinkIntent,
+        confidence: result.confidence,
+        action: deeplinkAction?.action
+      });
+
+      return {
+        isDeepLinkIntent: result.isDeepLinkIntent,
+        confidence: Math.max(0, Math.min(1, result.confidence)),
+        reasoning: result.reasoning || 'AI intent analysis',
+        response: result.response || 'I can help you with that!',
+        action: deeplinkAction
+      };
+
+    } catch (error) {
+      console.error('❌ Error in deeplink intent detection:', error);
+      return {
+        isDeepLinkIntent: false,
+        confidence: 0,
+        reasoning: 'Error in intent detection',
+        response: 'I can help you with various questions and tasks. What would you like to know?'
       };
     }
   }

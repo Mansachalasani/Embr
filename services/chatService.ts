@@ -517,51 +517,67 @@ export class ChatService {
       try {
         // Check if this is a deep link query first
         console.log('🔗 Checking for deep link actions...');
-        const isDeepLinkQuery = DeepLinkingService.isDeepLinkQuery(userMessage);
-        
-        if (isDeepLinkQuery) {
-          console.log('🔗 Processing deep link query:', userMessage);
-          const deepLinkResult = await DeepLinkingService.processDeepLinkQuery(userMessage);
-          
-          if (deepLinkResult.success) {
-            responses.push(this.createMessage(
-              'assistant',
-              `🔗 **Deep Link Action**\n\n${deepLinkResult.message}\n\nI've opened the ${deepLinkResult.action} for you!`,
-              { toolName: 'deepLink', toolData: deepLinkResult }
-            ));
-          } else {
-            responses.push(this.createMessage(
-              'assistant',
-              `🔗 **Deep Link Action**\n\n${deepLinkResult.message}\n\nYou can try:\n• "Call +1234567890"\n• "Open Amazon and show me shoes under $100"\n• "Play some music on Spotify"\n• "Navigate to Central Park"`,
-              { error: true, toolName: 'deepLink' }
-            ));
-          }
-        } else {
-          // Check if AI is available for regular processing
-          console.log('🔍 Checking AI availability...');
-          const aiAvailable = await AIService.checkAIAvailability();
-          console.log('🔍 AI Available:', aiAvailable);
-        
-          if (aiAvailable) {
-            // Use AI to process natural language query
-            console.log('🧠 Sending query to AI service...');
-            // Get user preferences for response style
-            const communicationStyle = await UserProfileService.getCommunicationStyle();
-            const responseStyle = communicationStyle?.response_length === 'short' ? 'brief' : 
-                                communicationStyle?.response_length === 'long' ? 'detailed' : 'conversational';
-            
-            const aiResponse = await AIService.processQuery({
-              query: userMessage,
-              sessionId,
-              preferences: {
-                responseStyle,
-                includeActions: true
+        // Process query with backend AI (which will handle deeplink detection)
+        // Check if AI is available for regular processing
+        console.log('🔍 Checking AI availability...');
+        const aiAvailable = await AIService.checkAIAvailability();
+        console.log('🔍 AI Available:', aiAvailable);
+
+        if (aiAvailable) {
+          // Use AI to process natural language query
+          console.log('🧠 Sending query to AI service...');
+          // Get user preferences for response style
+          const communicationStyle = await UserProfileService.getCommunicationStyle();
+          const responseStyle = communicationStyle?.response_length === 'short' ? 'brief' :
+                              communicationStyle?.response_length === 'long' ? 'detailed' : 'conversational';
+
+          const aiResponse = await AIService.processQuery({
+            query: userMessage,
+            sessionId,
+            preferences: {
+              responseStyle,
+              includeActions: true
+            }
+          });
+
+          console.log('🧠 AI Response:', aiResponse);
+
+          if (aiResponse.success && aiResponse.data) {
+            // Check if AI detected a deeplink action
+            if (aiResponse.data.deeplinkAction) {
+              console.log('🔗 AI detected deeplink action:', aiResponse.data.deeplinkAction);
+
+              // Execute the deeplink action
+              const deeplinkResult = await this.executeDeeplinkAction(aiResponse.data.deeplinkAction);
+
+              if (deeplinkResult.success) {
+                responses.push(this.createMessage(
+                  'assistant',
+                  `🔗 **App Action**\n\n${aiResponse.data.response}\n\n✅ Opened ${aiResponse.data.deeplinkAction.action}`,
+                  {
+                    toolName: 'aiDeeplink',
+                    toolData: {
+                      deeplinkAction: aiResponse.data.deeplinkAction,
+                      executionResult: deeplinkResult
+                    }
+                  }
+                ));
+              } else {
+                responses.push(this.createMessage(
+                  'assistant',
+                  `🔗 **App Action**\n\n${aiResponse.data.response}\n\n❌ ${deeplinkResult.message}`,
+                  {
+                    error: true,
+                    toolName: 'aiDeeplink',
+                    toolData: {
+                      deeplinkAction: aiResponse.data.deeplinkAction,
+                      executionResult: deeplinkResult
+                    }
+                  }
+                ));
               }
-            });
-            
-            console.log('🧠 AI Response:', aiResponse);
-            
-            if (aiResponse.success && aiResponse.data) {
+            } else {
+              // Regular AI response without deeplink
               responses.push(this.createMessage(
                 'assistant',
                 aiResponse.data.response,
@@ -579,7 +595,8 @@ export class ChatService {
                   { toolName: 'suggestions' }
                 ));
               }
-            } else {
+            }
+          } else {
               // AI failed, fall back to simple response
               console.log('❌ AI query failed:', aiResponse.error);
               responses.push(this.createMessage(
@@ -587,14 +604,13 @@ export class ChatService {
                 `Request failed please try again`
               ));
             }
-          } else {
-            // AI not available, use fallback
-            responses.push(this.createMessage(
-              'assistant',
-              `Request failed please try again`
-            ));
-          }
-        } // End of deep link else block
+        } else {
+          // AI not available, use fallback
+          responses.push(this.createMessage(
+            'assistant',
+            `Request failed please try again`
+          ));
+        }
       } catch (error) {
         console.error('❌ AI processing error:', error);
         console.error('❌ Error details:', error instanceof Error ? error.message : 'Unknown error');
@@ -1137,11 +1153,66 @@ export class ChatService {
     return this.createMessage(
       'assistant',
       response,
-      { 
-        toolName: 'generateContentWithAI', 
+      {
+        toolName: 'generateContentWithAI',
         toolData: result.data,
         wordCount: metadata?.wordCount
       }
     );
+  }
+
+  /**
+   * Execute a deeplink action received from the backend AI
+   */
+  private static async executeDeeplinkAction(action: any): Promise<{ success: boolean; message?: string }> {
+    try {
+      console.log('🚀 Executing deeplink action:', action);
+
+      // Map AI-detected actions to actual deeplink execution
+      const appMapping: Record<string, string> = {
+        'amazon': 'Amazon Search',
+        'spotify': 'Spotify Play',
+        'youtube': 'YouTube Search',
+        'maps': 'Open Maps',
+        'twitter': 'Open Twitter/X',
+        'whatsapp': 'Open WhatsApp',
+        'uber': 'Book Uber'
+      };
+
+      const mappedActionName = appMapping[action.appName];
+      if (!mappedActionName) {
+        return {
+          success: false,
+          message: `App "${action.appName}" not supported`
+        };
+      }
+
+      // Build query string based on extracted data
+      let queryString = action.appName;
+      if (action.data?.searchTerm) {
+        queryString = `${action.data.searchTerm} on ${action.appName}`;
+      } else if (action.data?.location) {
+        queryString = `navigate to ${action.data.location}`;
+      } else if (action.data?.destination) {
+        queryString = `uber to ${action.data.destination}`;
+      }
+
+      console.log('🎯 Mapped to deeplink query:', queryString);
+
+      // Use the existing DeepLinkingService to execute the action
+      const result = await DeepLinkingService.processDeepLinkQuery(queryString);
+
+      return {
+        success: result.success,
+        message: result.message
+      };
+
+    } catch (error) {
+      console.error('❌ Error executing deeplink action:', error);
+      return {
+        success: false,
+        message: 'Failed to execute app action'
+      };
+    }
   }
 }
