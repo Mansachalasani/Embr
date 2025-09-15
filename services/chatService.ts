@@ -528,8 +528,8 @@ export class ChatService {
           console.log('🧠 Sending query to AI service...');
           // Get user preferences for response style
           const communicationStyle = await UserProfileService.getCommunicationStyle();
-          const responseStyle = communicationStyle?.response_length === 'short' ? 'brief' :
-                              communicationStyle?.response_length === 'long' ? 'detailed' : 'conversational';
+          const responseStyle = communicationStyle?.response_length === 'long' ? 'detailed' :
+                              communicationStyle?.response_length === 'medium' ? 'conversational' : 'brief';
 
           const aiResponse = await AIService.processQuery({
             query: userMessage,

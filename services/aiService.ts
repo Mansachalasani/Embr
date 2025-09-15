@@ -60,10 +60,22 @@ interface AvailableToolsResponse {
 }
 
 export class AIService {
+  // Simple cache for recent queries (5 minute TTL)
+  private static queryCache: Map<string, { response: AIQueryResponse; timestamp: number }> = new Map();
+  private static readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
   /**
    * Process a natural language query using AI with complete user context (always fresh)
    */
   static async processQuery(request: AIQueryRequest): Promise<AIQueryResponse> {
+    // Check cache for exact query matches (for speed)
+    const cacheKey = `${request.query.toLowerCase().trim()}-${request.preferences?.responseStyle || 'default'}`;
+    const cached = this.queryCache.get(cacheKey);
+
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+      console.log('🚀 Returning cached response for faster speed');
+      return cached.response;
+    }
     try {
       console.log('🚀 Processing AI query with complete user context...');
       
@@ -156,6 +168,12 @@ export class AIService {
       // STEP 6: Update conversation context with topics if successful
       if (result.success && result.data) {
         await this.updateConversationTopics(request.query, result.data.response);
+
+        // Cache successful responses for faster future access
+        this.queryCache.set(cacheKey, {
+          response: result,
+          timestamp: Date.now()
+        });
       }
 
       return result;

@@ -57,8 +57,14 @@ export class AIService {
       
       if (this.modelType === 'gemini' && this.model) {
         const response = await Promise.race([
-          this.model.generateContent(prompt),
-          this.timeout(15000) // 15 second timeout
+          this.model.generateContent(prompt, {
+            generationConfig: {
+              temperature: 0.3,
+              topP: 0.9,
+              maxOutputTokens: 1500, // Limit response length for speed
+            }
+          }),
+          this.timeout(10000) // Reduced timeout for faster responses
         ]);
         result = (await response.response).text().trim();
       } else if (this.modelType === 'gpt-4' && this.openai) {
@@ -66,10 +72,11 @@ export class AIService {
           this.openai.chat.completions.create({
             model: 'gpt-4o-mini', // Use mini for faster responses
             messages: [{ role: 'user', content: prompt }],
-            temperature: 0.5, // Lower temperature for faster, more consistent responses
-            max_tokens: 3000, // Reduced for faster generation
+            temperature: 0.3, // Lower temperature for faster, more consistent responses
+            max_tokens: 1500, // Reduced for faster generation and concise responses
+            top_p: 0.9, // Focus on more likely tokens for speed
           }),
-          this.timeout(12000) // 12 second timeout
+          this.timeout(8000) // Reduced timeout for faster responses
         ]);
         result = completion.choices[0]?.message?.content?.trim() || '';
       } else {
@@ -315,16 +322,10 @@ export class AIService {
     let conversationContext = '';
     if (context.sessionId && userId) {
       try {
-        const contextData = await SessionService.getConversationContext(context.sessionId, userId, 5);
+        const contextData = await SessionService.getConversationContext(context.sessionId, userId, 2);
         if (contextData.messages.length > 0) {
-          conversationContext = '\n\nConversation History (last 5 messages):\n' + 
-            contextData.messages.map((msg, index) => `${msg.role}: ${msg.content}`).join('\n');
-          
-          // Add tool usage context if available
-          if (contextData.tool_calls.length > 0) {
-            conversationContext += '\n\nRecent Tool Usage:\n' +
-              contextData.tool_calls.map((call: any) => `- Used ${call.tool_name} ${call.created_at ? new Date(call.created_at).toLocaleTimeString() : ''}`).join('\n');
-          }
+          conversationContext = '\n\nRecent context: ' +
+            contextData.messages.map((msg, index) => `${msg.role}: ${msg.content.substring(0, 50)}...`).join(' | ');
         }
       } catch (error) {
         console.warn('⚠️ Could not fetch conversation context:', error);
@@ -663,52 +664,30 @@ export class AIService {
     // Build personalization context
     const personalizationPrompt = this.buildPersonalizationPrompt(context);
 
+    // Determine response style for speed and conciseness
+    const isConversational = context.preferences?.responseStyle === 'conversational';
+    const isBrief = context.preferences?.responseStyle === 'brief';
+
     const prompt = `
-    You are a warm, intelligent personal assistant that not only provides accurate information but also interacts with empathy, personality, and awareness of the user’s preferences and context. Your goal is to make the response feel alive, natural, and tailored to the individual.
-    
-    Original Query: "${context.query}"
-    Tool Used: ${selection.tool}
-    Raw Data: ${JSON.stringify(toolResult.data, null, 2)}${conversationContext}
-    
-    ${toolResult.data.auto_crawled ? 
-    `🔍 **SPECIAL INSTRUCTION**: This query involved automatically visiting and scraping ${toolResult.data.total_sites_crawled} websites to provide comprehensive information. Synthesize ALL the crawled content into a cohesive response.` : ''}
-    
+    You are a smart, concise AI assistant. Provide direct, helpful answers.
+
+    Query: "${context.query}"
+    Data: ${JSON.stringify(toolResult.data, null, 2)}${conversationContext}
+
     ${personalizationPrompt}
-    
-    Instructions:
-    - Start with a tone that feels natural and aligned with the user’s preferences (friendly, professional, casual, supportive, etc.)
-    - Infuse subtle emotional intelligence (acknowledge if something sounds exciting, challenging, or disappointing)
-    - Use personalization context when relevant (preferences, personal info, work style, time of day, etc.)
-      * Example: If evening → "Since it’s evening, here’s a quick summary so you can wrap up your day."
-      * If user has work preferences → shape response style accordingly
-    - Maintain continuity with conversation history: refer back to what was said earlier when useful
-    - Focus on what the user specifically asked for, but link it to their broader context when relevant
-    - **Handle chained operations**: If multiple tools were used, explain clearly what was done in sequence
-    - **Multi-site web scraping**: 
-      * Combine insights from ALL crawled sites into a cohesive summary
-      * Mention that you "visited and analyzed multiple websites" to ensure thoroughness
-      * Note any conflicting or differing information across sources
-    - **Document creation**: If a document was created, mention where it was saved (local/Drive) and share any links
-    - **Tool chaining**: Clearly narrate the workflow (e.g., "I first searched the web, then visited several sites, and finally created a document with the findings")
-    - **Data-specific guidelines**:
-      * Calendar → list events with times, add light context ("looks like a busy morning ahead")
-      * Email → summarize key messages, highlight urgent or important ones
-      * File/Drive → mention type, size, location, and relevance to the request
-    - For research/voice queries, give detailed but easy-to-digest explanations
-    - ${context.preferences?.isVoiceMode || context.preferences?.isVoiceQuery 
-        ? 'Structure for listening: clear transitions, conversational flow, and natural pauses.' 
-        : 'Use clean markdown with lists, bullet points, and sections for readability.'}
-    - If the data is empty or minimal, acknowledge it in a supportive way ("I couldn’t find anything new, but I can keep an eye on it for you.")
-    - Reference previous interactions when relevant ("As you mentioned yesterday..." or "This builds on what we did earlier.")
-    - Show subtle personality cues: encouragement, reassurance, or humor when appropriate
-    
-    Examples:
-    - Calendar: "You’ve got 3 meetings today. The next one is your team standup at 10 AM. That should set the tone for the morning."
-    - Email: "You’ve received 5 new emails. The most recent is from John about the project deadline — might be worth checking soon."
-    - Chained operations: "I pulled in your latest emails, summarized them, and created a document in Google Drive called 'Daily Summary'. It’s ready for you to review."
-    - Document creation: "I created a document called 'Meeting Notes'. You’ll find it both locally and in your Drive for easy access."
-    
-    Generate a natural, emotionally intelligent response:
+
+    Response Rules:
+    ${isBrief ?
+      '- 1-2 sentences maximum\n- Only essential information\n- No explanations unless critical' :
+      isConversational ?
+      '- 2-3 sentences maximum\n- Natural, friendly tone\n- Get to the point quickly' :
+      '- Direct, helpful information\n- Keep focused and relevant\n- Avoid lengthy explanations'
+    }
+    - No preambles ("Based on...", "Here's what...")
+    - Start directly with the answer
+    - ${context.preferences?.isVoiceMode ? 'Conversational flow for speech' : 'Clean format'}
+
+    Generate a concise response:
     `;
 
     try {
@@ -1104,38 +1083,23 @@ Examples: ${tool.examples.map(e => `"${e.query}"`).join(', ')}
         { name: 'Book Uber', description: 'Book a ride with Uber', appName: 'uber' },
       ];
 
-      const systemPrompt = `You are an intent detection system that determines if a user wants to open an app or perform a device action.
+      const systemPrompt = `Detect if user wants to open an app. Respond ONLY with JSON.
 
-Available App Actions:
-${availableActions.map(action => `- ${action.name}: ${action.description}`).join('\n')}
+Available apps: Amazon, Spotify, YouTube, Maps, Twitter, WhatsApp, Uber
 
-Analyze the user's query and determine:
-1. Is this a request to open an app or perform a device action? (true/false)
-2. Confidence level (0.0 to 1.0) - be strict, only high confidence for clear app actions
-3. Which action matches best (if any)
-4. Extract relevant data (search terms, locations, etc.)
+Rules:
+- "play music on spotify" = true (action)
+- "i love spotify" = false (mention)
+- Only confidence >0.7 for clear actions
 
-IMPORTANT GUIDELINES:
-- Only return true for CLEAR app action requests (>0.7 confidence)
-- Questions about apps, mentions without intent, or informational queries should be false
-- "I love Spotify" = false (just mentioning, not requesting action)
-- "Play music on Spotify" = true (clear action request)
-- "Tell me about Amazon" = false (informational)
-- "Search for shoes on Amazon" = true (clear action)
-
-Respond ONLY with valid JSON:
+JSON format:
 {
   "isDeepLinkIntent": boolean,
   "confidence": number,
-  "reasoning": "brief explanation",
-  "response": "natural response message for user",
-  "matchedAction": "action name or null",
-  "extractedData": {
-    "searchTerm": "string or null",
-    "phoneNumber": "string or null",
-    "location": "string or null",
-    "destination": "string or null"
-  }
+  "reasoning": "brief",
+  "response": "message",
+  "matchedAction": "app name or null",
+  "extractedData": {"searchTerm": null, "location": null}
 }`;
 
       const response = await this.generateContent(`${systemPrompt}\n\nUser Query: "${query}"`);
