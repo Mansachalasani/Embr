@@ -4,3 +4,7 @@ node_modules/
 .expo/  
 dist/  
 *.log
+
+# env
+.env
+mcp-backend/.env
